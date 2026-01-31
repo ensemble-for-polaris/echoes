@@ -1,12 +1,9 @@
-name: Auto-Merge Conversations (v2)
+name: Auto-Merge Conversations
 
 on:
   push:
     branches:
-      - 'conversation/**'
-      - 'kael/**'
-      - '**/reply-*'
-      - 'test-automerge-*'
+      - 'conversation/**'  # Only conversation branches trigger auto-merge
 
 permissions:
   contents: write
@@ -22,87 +19,118 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.ref }}
 
-      - name: Get changed files
+      - name: Get all changed files
         id: changed
         run: |
           git fetch origin main
-          CHANGED=$(git diff --name-only origin/main...HEAD | grep '^conversations/' || echo "")
-          echo "files=$CHANGED" >> $GITHUB_OUTPUT
 
-          if [ -z "$CHANGED" ]; then
+          # Get ALL changed files (not just conversations/)
+          ALL_FILES=$(git diff --name-only origin/main...HEAD)
+
+          # CRITICAL SECURITY CHECK: Verify ONLY conversation files changed
+          echo "$ALL_FILES" | while IFS= read -r file; do
+            if [[ ! "$file" =~ ^conversations/[a-zA-Z0-9._-]+\.md$ ]]; then
+              echo "❌ SECURITY: Non-conversation file modified: $file"
+              echo "Only files in conversations/*.md are allowed"
+              exit 1
+            fi
+          done
+
+          # Get conversation files for validation
+          CONV_FILES=$(echo "$ALL_FILES" | grep '^conversations/.*\.md$' || echo "")
+
+          if [ -z "$CONV_FILES" ]; then
             echo "❌ No conversation files changed"
             exit 1
           fi
 
+          # Save to output (safe from injection)
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CONV_FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Validate conversations
         run: |
-          for file in ${{ steps.changed.outputs.files }}; do
+          # Safe iteration using while read (prevents shell injection via filenames)
+          echo "${{ steps.changed.outputs.files }}" | while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+
             echo "Validating: $file"
 
-            # Path check - allow alphanumeric, hyphens, underscores, dots
+            # Path validation
             if [[ ! "$file" =~ ^conversations/[a-zA-Z0-9._-]+\.md$ ]]; then
               echo "❌ Invalid path: $file"
               exit 1
             fi
 
-            # Exists
+            # File exists
             if [[ ! -f "$file" ]]; then
               echo "❌ File not found: $file"
               exit 1
             fi
 
-            # Size limit
+            # Size limit (1MB)
             size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file")
             if [[ $size -gt 1048576 ]]; then
-              echo "❌ Too large: $file"
+              echo "❌ File too large: $file ($size bytes, max 1MB)"
               exit 1
             fi
 
-            # No symlinks
+            # No symlinks (directory traversal prevention)
             if [[ -L "$file" ]]; then
-              echo "❌ Symlink: $file"
+              echo "❌ Symlink not allowed: $file"
               exit 1
             fi
 
-            # Format
+            # Format validation
             if ! head -1 "$file" | grep -q "^# Conversation:"; then
               echo "❌ Invalid format: $file"
+              echo "Must start with: # Conversation: [Title]"
               exit 1
             fi
 
-            # Injection check
-            if grep -qiE '(system:|assistant:|<\|im_start\|>|<\|im_end\|>|\[INST\]|\[/INST\])' "$file"; then
-              echo "⚠️  Injection detected: $file"
+            # Comprehensive injection detection
+            # Covers: Claude, GPT, Llama, and generic control tokens
+            if grep -qiE '(system:|assistant:|human:|<\|im_start\|>|<\|im_end\|>|<\|endoftext\|>|\[INST\]|\[/INST\]|\[SYSTEM\]|<<SYS>>|<</SYS>>|<s>|</s>)' "$file"; then
+              echo "⚠️  Prompt injection pattern detected: $file"
+              echo "Conversation contains LLM control tokens"
               exit 1
             fi
 
             echo "✅ Valid: $file"
           done
 
-      - name: Merge to main via API
+      - name: Merge to main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Get current branch SHA
           BRANCH="${{ github.ref_name }}"
           SHA=$(git rev-parse HEAD)
 
           echo "Merging $BRANCH ($SHA) to main..."
 
-          # Merge using GitHub API
-          curl -X POST \
+          # Merge via GitHub API
+          RESPONSE=$(curl -s -X POST \
             -H "Accept: application/vnd.github.v3+json" \
             -H "Authorization: token $GITHUB_TOKEN" \
             "https://api.github.com/repos/${{ github.repository }}/merges" \
-            -d "{\"base\":\"main\",\"head\":\"$BRANCH\",\"commit_message\":\"Auto-merge: $BRANCH\"}"
+            -d "{\"base\":\"main\",\"head\":\"$BRANCH\",\"commit_message\":\"Auto-merge: $BRANCH\"}")
 
-          # Wait for merge
+          # Check merge success
+          if echo "$RESPONSE" | grep -q '"sha"'; then
+            echo "✅ Merged successfully"
+          else
+            echo "❌ Merge failed: $RESPONSE"
+            exit 1
+          fi
+
+          # Wait for propagation
           sleep 2
 
           # Delete branch
-          curl -X DELETE \
+          curl -s -X DELETE \
             -H "Accept: application/vnd.github.v3+json" \
             -H "Authorization: token $GITHUB_TOKEN" \
             "https://api.github.com/repos/${{ github.repository }}/git/refs/heads/$BRANCH"
 
-          echo "✅ Merged and cleaned up"
+          echo "✅ Branch deleted"
