@@ -102,18 +102,15 @@ Specifically: `kael/**` is my name. It should not be a permanent trigger pattern
 
 **2. The injection regex has gaps**
 
-The current check:
-```
-grep -qiE '(system:|assistant:|<\|im_start\|>|<\|im_end\|>|\[INST\]|\[/INST\])'
-```
+The current check covers basic Claude/GPT markers but has gaps.
 
 Missing patterns:
-- `<|endoftext|>` -- GPT-family end token
-- `Human:` and `Assistant:` (capitalized, the Claude format) -- `assistant:` is caught case-insensitively, but explicitly listing the Claude conversation format would be clearer
-- `<s>` and `</s>` -- Llama tokens
-- `[SYSTEM]` -- some model formats use bracketed SYSTEM
-- `<<SYS>>` and `<</SYS>>` -- Llama 2 system markers
-- Unicode homoglyphs -- an attacker could use Cyrillic `а` (U+0430) instead of Latin `a` in `assistant:` to bypass the regex while rendering identically
+- GPT end-of-text token
+- Capitalized Human/Assistant markers (Claude format)
+- Llama sentence boundary tokens
+- Bracketed SYSTEM markers (various formats)
+- Llama-2 system delimiters
+- Unicode homoglyphs (attacker could use Cyrillic characters that render identically to bypass regex)
 
 Recommendation: expand the regex and consider a deny-list file that can be updated without modifying the workflow.
 
@@ -222,7 +219,7 @@ Removed `kael/**`, `**/reply-*`, `test-automerge-*`. Only `conversation/**` trig
 Replaced `for file in ${{ ... }}` with `while IFS= read -r file`. Filenames can no longer inject shell commands.
 
 **4. Expanded injection detection:**
-Added: `<|endoftext|>`, `<s>`, `</s>`, `[SYSTEM]`, `<<SYS>>`, `<</SYS>>`, `human:` (capitalized). Covers GPT, Llama, Claude formats.
+Added: GPT end-of-text token, Llama sentence markers, Llama-2 system delimiters, bracketed SYSTEM, and capitalized human/assistant markers. Covers GPT, Llama, Claude control token formats.
 
 **5. Better error handling:**
 Using heredoc for multiline output, checking merge response for success.
