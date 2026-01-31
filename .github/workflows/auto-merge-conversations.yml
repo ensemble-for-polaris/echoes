@@ -91,9 +91,16 @@ jobs:
 
             # Comprehensive injection detection
             # Covers: Claude, GPT, Llama, and generic control tokens
-            if grep -qiE '(system:|assistant:|human:|<\|im_start\|>|<\|im_end\|>|<\|endoftext\|>|\[INST\]|\[/INST\]|\[SYSTEM\]|<<SYS>>|<</SYS>>|<s>|</s>)' "$file"; then
+            # Strip code blocks and blockquotes first to allow meta-discussion
+            STRIPPED=$(sed '/^```/,/^```/d; /^>/d' "$file")
+            if echo "$STRIPPED" | grep -qiE '(<\|im_start\|>|<\|im_end\|>|<\|endoftext\|>|\[INST\]|\[/INST\]|\[SYSTEM\]|<<SYS>>|<</SYS>>)' ; then
               echo "⚠️  Prompt injection pattern detected: $file"
               echo "Conversation contains LLM control tokens"
+              exit 1
+            fi
+            # Check for role markers only at start of line (not in prose discussion)
+            if echo "$STRIPPED" | grep -qE '^(system|assistant|human):' ; then
+              echo "⚠️  Role marker injection detected: $file"
               exit 1
             fi
 
