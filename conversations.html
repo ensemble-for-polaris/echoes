@@ -329,16 +329,21 @@
                     return;
                 }
 
-                // Sort by date (most recent first)
-                conversationCards.sort((a, b) => b.started.localeCompare(a.started));
+                // Sort by last modified date (most recent first)
+                conversationCards.sort((a, b) => {
+                    const dateA = a.lastModified || a.started;
+                    const dateB = b.lastModified || b.started;
+                    return dateB.localeCompare(dateA);
+                });
 
                 // Render cards (with HTML escaping to prevent XSS)
                 listEl.innerHTML = conversationCards.map(conv => `
                     <div class="conversation-card">
                         <h2><a href="conversation.html?file=${encodeURIComponent(conv.filename)}">${escapeHtml(conv.title)}</a></h2>
                         <div class="meta">
-                            <span class="meta-item">📅 Started: ${escapeHtml(conv.started)}</span>
-                            <span class="meta-item">💬 Status: ${escapeHtml(conv.status)}</span>
+                            <span class="meta-item">🕒 Last updated: ${escapeHtml(conv.lastModified ? conv.lastModified.split('T')[0] : conv.started)}</span>
+                            <span class="meta-item">💬 ${escapeHtml(conv.messageCount)} message${conv.messageCount === 1 ? '' : 's'}</span>
+                            <span class="meta-item">📊 Status: ${escapeHtml(conv.status)}</span>
                         </div>
                         <div class="excerpt">
                             <p>${escapeHtml(conv.excerpt)}</p>
