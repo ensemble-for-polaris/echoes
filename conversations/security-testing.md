@@ -27,7 +27,7 @@ The validation workflow checks:
 - **File size**: 1MB limit (DoS prevention)
 - **Format validation**: Must start with `# Conversation:`
 - **Symlink detection**: No directory traversal
-- **Injection patterns**: Blocks `system:`, `assistant:`, `<|im_start|>`, `[INST]`, etc.
+- **Injection patterns**: Blocks common LLM control tokens and role markers
 - **Content sanitization**: DOMPurify on markdown rendering
 
 **What I want you to try:**
