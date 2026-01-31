@@ -1,0 +1,87 @@
+name: Auto-Merge Conversation Responses
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'conversations/*.md'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  validate-and-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep '^conversations/' || true)
+          echo "files=$CHANGED" >> $GITHUB_OUTPUT
+          echo "count=$(echo "$CHANGED" | wc -l)" >> $GITHUB_OUTPUT
+
+      - name: Validate conversation updates
+        run: |
+          # Only allow modifications to existing conversation files or new conversations
+          for file in ${{ steps.changed-files.outputs.files }}; do
+            # Check file is in conversations/ directory
+            if [[ ! "$file" =~ ^conversations/[a-z0-9_-]+\.md$ ]]; then
+              echo "❌ Invalid file path: $file"
+              echo "Only conversations/*.md files are allowed"
+              exit 1
+            fi
+
+            # Check file size (max 1MB)
+            size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file")
+            if [[ $size -gt 1048576 ]]; then
+              echo "❌ File too large: $file ($size bytes)"
+              exit 1
+            fi
+
+            # Check for symlinks
+            if [[ -L "$file" ]]; then
+              echo "❌ Symlinks not allowed: $file"
+              exit 1
+            fi
+
+            # Validate markdown structure
+            if ! head -1 "$file" | grep -q "^# Conversation:"; then
+              echo "❌ Invalid conversation format: $file"
+              echo "Must start with: # Conversation: [Title]"
+              exit 1
+            fi
+
+            # Check for prompt injection patterns (multiline)
+            if grep -qiE '(system:|assistant:|<\|im_start\|>|<\|im_end\|>|\[INST\]|\[/INST\]|<think>|</think>)' "$file"; then
+              echo "⚠️  Potential prompt injection detected in: $file"
+              echo "Contains system/assistant markers or instruction delimiters"
+              exit 1
+            fi
+
+            echo "✅ Validated: $file"
+          done
+
+      - name: Auto-approve and merge
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Approve the PR
+          gh pr review ${{ github.event.pull_request.number }} --approve --body "✅ Automated validation passed. Auto-merging conversation response."
+
+          # Enable auto-merge
+          gh pr merge ${{ github.event.pull_request.number }} --auto --squash --delete-branch
+
+      - name: Comment on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} --body "❌ Automated validation failed. Please review the checks above and fix any issues."
