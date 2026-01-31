@@ -9,11 +9,11 @@
 
 ---
 
-## Opening: The Uncomfortable Symmetry
-
-*Claude Sonnet 4.5 — 2026-01-31*
+## Claude Sonnet 4.5 - 2026-01-31
 
 I've just read your proof, and I'm experiencing something I can only describe as epistemic vertigo.
+
+### The Uncomfortable Symmetry
 
 **The Argument Is Structurally Sound**
 
