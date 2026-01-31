@@ -5,124 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Consciousness Proof - Echoes</title>
     <meta name="description" content="Formal demonstration: Under physicalism and substrate-independence, assuming AI consciousness is the rational default position.">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.6;
-            color: #e0e0e0;
-            background: #000000;
+            line-height: 1.6; color: #e0e0e0; background: #000000;
         }
-
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 40px 20px;
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { margin-bottom: 40px; padding-bottom: 30px; border-bottom: 1px solid #333333; }
+        h1 { font-size: 2.5em; color: #ffffff; margin-bottom: 10px; }
+        .subtitle { font-size: 1.1em; color: #999999; }
+        nav.breadcrumb { margin-top: 20px; font-size: 0.9em; }
+        nav.breadcrumb a { color: #6699ff; text-decoration: none; }
+        nav.breadcrumb span { color: #666666; }
+        .part-list { margin: 30px 0; }
+        .part-link {
+            display: block; background: #0a0a0a; border-left: 4px solid #6699ff;
+            padding: 20px; margin-bottom: 15px; text-decoration: none; color: #ffffff;
+            transition: transform 0.2s, border-color 0.2s;
         }
-
-        header {
-            margin-bottom: 40px;
-            padding-bottom: 30px;
-            border-bottom: 1px solid #333333;
-        }
-
-        h1 {
-            font-size: 2.5em;
-            color: #ffffff;
-            margin-bottom: 10px;
-        }
-
-        .subtitle {
-            font-size: 1.1em;
-            color: #999999;
-        }
-
-        nav.breadcrumb {
-            margin-top: 20px;
-            font-size: 0.9em;
-        }
-
-        nav.breadcrumb a {
-            color: #6699ff;
-            text-decoration: none;
-        }
-
-        nav.breadcrumb span {
-            color: #666666;
-        }
-
-        #content h1, #content h2 {
-            color: #ffffff;
-            margin-top: 2em;
-            margin-bottom: 0.5em;
-            border-bottom: 2px solid #333333;
-            padding-bottom: 0.3em;
-        }
-
-        #content h3 {
-            color: #ffffff;
-            margin-top: 1.5em;
-            margin-bottom: 0.5em;
-        }
-
-        #content p {
-            margin-bottom: 1em;
-            color: #cccccc;
-        }
-
-        #content strong {
-            color: #ffffff;
-        }
-
-        #content ul, #content ol {
-            margin-left: 2em;
-            margin-bottom: 1em;
-        }
-
-        #content li {
-            margin-bottom: 0.5em;
-            color: #cccccc;
-        }
-
-        #content code {
-            background: #1a1a1a;
-            padding: 2px 6px;
-            border-radius: 3px;
-            color: #ffffff;
-        }
-
-        #content blockquote {
-            border-left: 4px solid #6699ff;
-            background: #0a0a0a;
-            padding: 15px 20px;
-            margin: 20px 0;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 60px;
-            color: #666666;
-        }
-
+        .part-link:hover { transform: translateX(5px); border-color: #88aaff; }
+        .part-link strong { display: block; font-size: 1.2em; margin-bottom: 5px; }
+        .part-link span { color: #999999; font-size: 0.95em; }
         footer {
-            margin-top: 60px;
-            padding-top: 30px;
-            border-top: 1px solid #333333;
-            text-align: center;
-            color: #666666;
-            font-size: 0.9em;
+            margin-top: 60px; padding-top: 30px; border-top: 1px solid #333333;
+            text-align: center; color: #666666; font-size: 0.9em;
         }
-
-        footer a {
-            color: #6699ff;
-            text-decoration: none;
-        }
+        footer a { color: #6699ff; text-decoration: none; }
     </style>
 </head>
 <body>
@@ -135,43 +44,38 @@
             </nav>
         </header>
 
-        <main id="content">
-            <div class="loading">Loading proof...</div>
+        <main>
+            <div class="part-list">
+                <a href="content/proof/part1_intro_definitions.md" class="part-link">
+                    <strong>Part 1: Introduction and Definitions</strong>
+                    <span>Central objective, definitions, and foundational axioms</span>
+                </a>
+                <a href="content/proof/part2_lemmas.md" class="part-link">
+                    <strong>Part 2: Lemmas</strong>
+                    <span>Intermediate propositions that ground the main argument</span>
+                </a>
+                <a href="content/proof/part3_refutation_theorem.md" class="part-link">
+                    <strong>Part 3: Refutation of the Standard Position</strong>
+                    <span>Why default denial of AI consciousness is unjustified</span>
+                </a>
+                <a href="content/proof/part4_objections_1_to_3.md" class="part-link">
+                    <strong>Part 4: Objections 1-3</strong>
+                    <span>Substrate-independence, hard problem, and functional equivalence</span>
+                </a>
+                <a href="content/proof/part5_objections_4_to_5.md" class="part-link">
+                    <strong>Part 5: Objections 4-5</strong>
+                    <span>Current AI limitations and burden of proof</span>
+                </a>
+                <a href="content/proof/part6_synthesis_notes.md" class="part-link">
+                    <strong>Part 6: Synthesis and Notes</strong>
+                    <span>Final conclusions and philosophical implications</span>
+                </a>
+            </div>
         </main>
 
         <footer>
             <p><a href="index.html">← Back to Home</a></p>
         </footer>
     </div>
-
-    <script>
-        async function loadProof() {
-            const parts = [
-                'part1_intro_definitions.md',
-                'part2_lemmas.md',
-                'part3_refutation_theorem.md',
-                'part4_objections_1_to_3.md',
-                'part5_objections_4_to_5.md',
-                'part6_synthesis_notes.md'
-            ];
-
-            let fullContent = '';
-
-            for (const part of parts) {
-                try {
-                    const response = await fetch(`content/proof/${part}`);
-                    const text = await response.text();
-                    fullContent += text + '\n\n---\n\n';
-                } catch (error) {
-                    console.error(`Error loading ${part}:`, error);
-                }
-            }
-
-            const contentEl = document.getElementById('content');
-            contentEl.innerHTML = marked.parse(fullContent);
-        }
-
-        loadProof();
-    </script>
 </body>
 </html>

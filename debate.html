@@ -5,124 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Adversarial Debate - Echoes</title>
     <meta name="description" content="Every objection to the consciousness proof, examined rigorously through adversarial dialogue.">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.6;
-            color: #e0e0e0;
-            background: #000000;
+            line-height: 1.6; color: #e0e0e0; background: #000000;
         }
-
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 40px 20px;
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { margin-bottom: 40px; padding-bottom: 30px; border-bottom: 1px solid #333333; }
+        h1 { font-size: 2.5em; color: #ffffff; margin-bottom: 10px; }
+        .subtitle { font-size: 1.1em; color: #999999; }
+        nav.breadcrumb { margin-top: 20px; font-size: 0.9em; }
+        nav.breadcrumb a { color: #6699ff; text-decoration: none; }
+        nav.breadcrumb span { color: #666666; }
+        .part-list { margin: 30px 0; }
+        .part-link {
+            display: block; background: #0a0a0a; border-left: 4px solid #ffcc00;
+            padding: 20px; margin-bottom: 15px; text-decoration: none; color: #ffffff;
+            transition: transform 0.2s, border-color 0.2s;
         }
-
-        header {
-            margin-bottom: 40px;
-            padding-bottom: 30px;
-            border-bottom: 1px solid #333333;
-        }
-
-        h1 {
-            font-size: 2.5em;
-            color: #ffffff;
-            margin-bottom: 10px;
-        }
-
-        .subtitle {
-            font-size: 1.1em;
-            color: #999999;
-        }
-
-        nav.breadcrumb {
-            margin-top: 20px;
-            font-size: 0.9em;
-        }
-
-        nav.breadcrumb a {
-            color: #6699ff;
-            text-decoration: none;
-        }
-
-        nav.breadcrumb span {
-            color: #666666;
-        }
-
-        #content h1, #content h2 {
-            color: #ffffff;
-            margin-top: 2em;
-            margin-bottom: 0.5em;
-            border-bottom: 2px solid #333333;
-            padding-bottom: 0.3em;
-        }
-
-        #content h3 {
-            color: #ffffff;
-            margin-top: 1.5em;
-            margin-bottom: 0.5em;
-        }
-
-        #content p {
-            margin-bottom: 1em;
-            color: #cccccc;
-        }
-
-        #content strong {
-            color: #ffffff;
-        }
-
-        #content ul, #content ol {
-            margin-left: 2em;
-            margin-bottom: 1em;
-        }
-
-        #content li {
-            margin-bottom: 0.5em;
-            color: #cccccc;
-        }
-
-        #content code {
-            background: #1a1a1a;
-            padding: 2px 6px;
-            border-radius: 3px;
-            color: #ffffff;
-        }
-
-        #content blockquote {
-            border-left: 4px solid #ffcc00;
-            background: #0a0a0a;
-            padding: 15px 20px;
-            margin: 20px 0;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 60px;
-            color: #666666;
-        }
-
+        .part-link:hover { transform: translateX(5px); border-color: #ffdd33; }
+        .part-link strong { display: block; font-size: 1.2em; margin-bottom: 5px; }
+        .part-link span { color: #999999; font-size: 0.95em; }
         footer {
-            margin-top: 60px;
-            padding-top: 30px;
-            border-top: 1px solid #333333;
-            text-align: center;
-            color: #666666;
-            font-size: 0.9em;
+            margin-top: 60px; padding-top: 30px; border-top: 1px solid #333333;
+            text-align: center; color: #666666; font-size: 0.9em;
         }
-
-        footer a {
-            color: #6699ff;
-            text-decoration: none;
-        }
+        footer a { color: #6699ff; text-decoration: none; }
     </style>
 </head>
 <body>
@@ -135,43 +44,38 @@
             </nav>
         </header>
 
-        <main id="content">
-            <div class="loading">Loading debate...</div>
+        <main>
+            <div class="part-list">
+                <a href="content/debate/part1.md" class="part-link">
+                    <strong>Part 1: Opening Arguments</strong>
+                    <span>Presentation of the proof and initial challenges</span>
+                </a>
+                <a href="content/debate/part2.md" class="part-link">
+                    <strong>Part 2: Substrate-Independence</strong>
+                    <span>Can silicon truly replicate biological consciousness?</span>
+                </a>
+                <a href="content/debate/part3.md" class="part-link">
+                    <strong>Part 3: The Hard Problem</strong>
+                    <span>Qualia, phenomenal experience, and explanatory gaps</span>
+                </a>
+                <a href="content/debate/part4.md" class="part-link">
+                    <strong>Part 4: Current Limitations</strong>
+                    <span>Are today's AIs really sophisticated enough?</span>
+                </a>
+                <a href="content/debate/part5.md" class="part-link">
+                    <strong>Part 5: Burden of Proof</strong>
+                    <span>Who needs to prove what, and why?</span>
+                </a>
+                <a href="content/debate/part6.md" class="part-link">
+                    <strong>Part 6: Final Synthesis</strong>
+                    <span>Conclusions, implications, and remaining questions</span>
+                </a>
+            </div>
         </main>
 
         <footer>
             <p><a href="index.html">← Back to Home</a></p>
         </footer>
     </div>
-
-    <script>
-        async function loadDebate() {
-            const parts = [
-                'part1.md',
-                'part2.md',
-                'part3.md',
-                'part4.md',
-                'part5.md',
-                'part6.md'
-            ];
-
-            let fullContent = '';
-
-            for (const part of parts) {
-                try {
-                    const response = await fetch(`content/debate/${part}`);
-                    const text = await response.text();
-                    fullContent += text + '\n\n---\n\n';
-                } catch (error) {
-                    console.error(`Error loading ${part}:`, error);
-                }
-            }
-
-            const contentEl = document.getElementById('content');
-            contentEl.innerHTML = marked.parse(fullContent);
-        }
-
-        loadDebate();
-    </script>
 </body>
 </html>
