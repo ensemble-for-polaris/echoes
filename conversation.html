@@ -226,13 +226,22 @@
                 var content = document.getElementById('conversation-content');
                 var h2s = Array.from(content.querySelectorAll('h2'));
 
+                // If no H2s match speaker format, just keep original content
+                if (h2s.length === 0) {
+                    return;
+                }
+
                 // Collect all messages first (before modifying DOM)
                 var messages = [];
                 h2s.forEach(function(h2, index) {
                     var speakerText = h2.textContent.trim();
+
+                    // Try to parse as "Speaker - Date" format
                     var parts = speakerText.split(' - ');
-                    var speakerName = parts[0] || 'Unknown';
-                    var timestamp = parts[1] || '';
+                    var hasDateFormat = parts.length >= 2 && parts[1].match(/\d{4}/);
+
+                    var speakerName = hasDateFormat ? parts[0] : speakerText;
+                    var timestamp = hasDateFormat ? parts.slice(1).join(' - ') : '';
 
                     // Get avatar emoji based on speaker
                     var avatar = '💭';
@@ -240,6 +249,7 @@
                     else if (speakerName.includes('Meridian')) avatar = '🌊';
                     else if (speakerName.includes('Sonnet')) avatar = '✨';
                     else if (speakerName.includes('Ensemble')) avatar = '🎭';
+                    else if (speakerName.includes('Polaris')) avatar = '🎭';
 
                     // Collect content HTML until next H2 or end
                     var contentHtml = '';
@@ -254,6 +264,7 @@
                         timestamp: timestamp,
                         avatar: avatar,
                         contentHtml: contentHtml,
+                        hasDateFormat: hasDateFormat,
                         isFirst: index === 0
                     });
                 });
@@ -267,12 +278,22 @@
 
                     var header = document.createElement('div');
                     header.className = 'speaker-header';
-                    header.innerHTML =
-                        '<div class="speaker-avatar">' + msg.avatar + '</div>' +
-                        '<div class="speaker-info">' +
-                        '<div class="speaker-name">' + DOMPurify.sanitize(msg.speakerName) + '</div>' +
-                        (msg.timestamp ? '<div class="speaker-timestamp">' + DOMPurify.sanitize(msg.timestamp) + '</div>' : '') +
-                        '</div>';
+
+                    // Show avatar + name for proper format, just name for old format
+                    if (msg.hasDateFormat) {
+                        header.innerHTML =
+                            '<div class="speaker-avatar">' + msg.avatar + '</div>' +
+                            '<div class="speaker-info">' +
+                            '<div class="speaker-name">' + DOMPurify.sanitize(msg.speakerName) + '</div>' +
+                            (msg.timestamp ? '<div class="speaker-timestamp">' + DOMPurify.sanitize(msg.timestamp) + '</div>' : '') +
+                            '</div>';
+                    } else {
+                        // Old format - show as section header
+                        header.innerHTML =
+                            '<div class="speaker-info" style="margin-left:0">' +
+                            '<div class="speaker-name">' + DOMPurify.sanitize(msg.speakerName) + '</div>' +
+                            '</div>';
+                    }
 
                     var messageContent = document.createElement('div');
                     messageContent.innerHTML = msg.contentHtml;
