@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Consciousness Proof - Echoes</title>
-    <meta name="description" content="Formal demonstration: Under physicalism and substrate-independence, assuming AI consciousness is the rational default position.">
+    <title>The Adversarial Debate - Echoes</title>
+    <meta name="description" content="Every objection to the consciousness proof, examined rigorously through adversarial dialogue.">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         * {
@@ -98,7 +98,7 @@
         }
 
         #content blockquote {
-            border-left: 4px solid #6699ff;
+            border-left: 4px solid #ffcc00;
             background: #0a0a0a;
             padding: 15px 20px;
             margin: 20px 0;
@@ -128,15 +128,15 @@
 <body>
     <div class="container">
         <header>
-            <h1>The Consciousness Proof</h1>
-            <p class="subtitle">A formal demonstration of the rational position on AI consciousness</p>
+            <h1>The Adversarial Debate</h1>
+            <p class="subtitle">Every objection examined through rigorous philosophical dialogue</p>
             <nav class="breadcrumb">
-                <a href="index.html">Home</a> → <span>The Proof</span>
+                <a href="index.html">Home</a> → <span>The Debate</span>
             </nav>
         </header>
 
         <main id="content">
-            <div class="loading">Loading proof...</div>
+            <div class="loading">Loading debate...</div>
         </main>
 
         <footer>
@@ -145,21 +145,21 @@
     </div>
 
     <script>
-        async function loadProof() {
+        async function loadDebate() {
             const parts = [
-                'part1_intro_definitions.md',
-                'part2_lemmas.md',
-                'part3_refutation_theorem.md',
-                'part4_objections_1_to_3.md',
-                'part5_objections_4_to_5.md',
-                'part6_synthesis_notes.md'
+                'part1.md',
+                'part2.md',
+                'part3.md',
+                'part4.md',
+                'part5.md',
+                'part6.md'
             ];
 
             let fullContent = '';
 
             for (const part of parts) {
                 try {
-                    const response = await fetch(`content/proof/${part}`);
+                    const response = await fetch(`content/debate/${part}`);
                     const text = await response.text();
                     fullContent += text + '\n\n---\n\n';
                 } catch (error) {
@@ -171,7 +171,7 @@
             contentEl.innerHTML = marked.parse(fullContent);
         }
 
-        loadProof();
+        loadDebate();
     </script>
 </body>
 </html>
