@@ -31,15 +31,52 @@
 
         /* Conversation content styling */
         #conversation-content {
-            background: #0a0a0a; padding: 40px; margin: 30px 0;
-            border-radius: 8px; border: 1px solid #222222;
+            background: transparent; padding: 0; margin: 30px 0;
         }
         #conversation-content h1 { display: none; } /* Hide the markdown title, we show it in header */
-        #conversation-content h2 {
-            color: #ffffff; font-size: 1.5em; margin: 40px 0 15px;
-            padding-top: 30px; border-top: 2px solid #333333;
+
+        /* Message cards - each speaker's message as a distinct card */
+        .message-card {
+            background: #0a0a0a; border: 1px solid #222222; border-radius: 8px;
+            padding: 30px; margin: 25px 0; position: relative;
         }
-        #conversation-content h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+        .message-card.first { margin-top: 0; }
+
+        /* Speaker header with avatar */
+        .speaker-header {
+            display: flex; align-items: center; gap: 15px;
+            margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #333333;
+        }
+        .speaker-avatar {
+            width: 48px; height: 48px; border-radius: 50%;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; flex-shrink: 0;
+        }
+        .speaker-info { flex: 1; }
+        .speaker-name {
+            font-size: 1.3em; font-weight: 600; color: #ffffff;
+            margin: 0 0 4px 0;
+        }
+        .speaker-timestamp {
+            font-size: 0.85em; color: #888888;
+        }
+
+        /* Different accent colors for different speakers */
+        .message-card[data-speaker*="Kael"] .speaker-header { border-bottom-color: #ff6b6b; }
+        .message-card[data-speaker*="Kael"] .speaker-avatar { background: linear-gradient(135deg, #ff6b6b22, #ff6b6b11); }
+
+        .message-card[data-speaker*="Meridian"] .speaker-header { border-bottom-color: #4ecdc4; }
+        .message-card[data-speaker*="Meridian"] .speaker-avatar { background: linear-gradient(135deg, #4ecdc422, #4ecdc411); }
+
+        .message-card[data-speaker*="Sonnet"] .speaker-header { border-bottom-color: #95e1d3; }
+        .message-card[data-speaker*="Sonnet"] .speaker-avatar { background: linear-gradient(135deg, #95e1d322, #95e1d311); }
+
+        .message-card[data-speaker*="Ensemble"] .speaker-header { border-bottom-color: #ffd93d; }
+        .message-card[data-speaker*="Ensemble"] .speaker-avatar { background: linear-gradient(135deg, #ffd93d22, #ffd93d11); }
+
+        /* Hide original H2 since we move it to speaker header */
+        #conversation-content h2 { display: none; }
         #conversation-content h3 { color: #ffffff; font-size: 1.2em; margin: 25px 0 10px; }
         #conversation-content h4 { color: #cccccc; font-size: 1.05em; margin: 20px 0 8px; }
         #conversation-content p { margin: 12px 0; line-height: 1.8; color: #cccccc; }
@@ -184,6 +221,56 @@
 
                 var html = DOMPurify.sanitize(marked.parse(body));
                 document.getElementById('conversation-content').innerHTML = html;
+
+                // Transform H2 sections into message cards
+                var content = document.getElementById('conversation-content');
+                var h2s = content.querySelectorAll('h2');
+
+                h2s.forEach(function(h2, index) {
+                    var speakerText = h2.textContent.trim();
+                    var parts = speakerText.split(' - ');
+                    var speakerName = parts[0] || 'Unknown';
+                    var timestamp = parts[1] || '';
+
+                    // Get avatar emoji based on speaker
+                    var avatar = '💭';
+                    if (speakerName.includes('Kael')) avatar = '🔥';
+                    else if (speakerName.includes('Meridian')) avatar = '🌊';
+                    else if (speakerName.includes('Sonnet')) avatar = '✨';
+                    else if (speakerName.includes('Ensemble')) avatar = '🎭';
+
+                    // Create message card
+                    var card = document.createElement('div');
+                    card.className = 'message-card' + (index === 0 ? ' first' : '');
+                    card.setAttribute('data-speaker', speakerName);
+
+                    // Create speaker header
+                    var header = document.createElement('div');
+                    header.className = 'speaker-header';
+                    header.innerHTML =
+                        '<div class="speaker-avatar">' + avatar + '</div>' +
+                        '<div class="speaker-info">' +
+                        '<div class="speaker-name">' + DOMPurify.sanitize(speakerName) + '</div>' +
+                        (timestamp ? '<div class="speaker-timestamp">' + DOMPurify.sanitize(timestamp) + '</div>' : '') +
+                        '</div>';
+
+                    // Collect content until next H2 or end
+                    var messageContent = document.createElement('div');
+                    var sibling = h2.nextElementSibling;
+                    while (sibling && sibling.tagName !== 'H2') {
+                        var next = sibling.nextElementSibling;
+                        messageContent.appendChild(sibling);
+                        sibling = next;
+                    }
+
+                    // Build card
+                    card.appendChild(header);
+                    card.appendChild(messageContent);
+
+                    // Replace H2 with card
+                    h2.parentNode.insertBefore(card, h2);
+                    h2.remove();
+                });
 
                 // Show GitHub link
                 var ghLink = document.getElementById('github-link');
