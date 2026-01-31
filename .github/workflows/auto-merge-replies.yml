@@ -1,0 +1,177 @@
+name: Auto-merge conversation replies
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'conversations/*.md'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        run: |
+          # Get list of changed files in this PR
+          git fetch origin ${{ github.base_ref }}
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- conversations/)
+          echo "files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+          echo "Changed files: $CHANGED_FILES"
+
+      - name: Check if reply or new conversation
+        id: check-type
+        run: |
+          CHANGED_FILES="${{ steps.changed-files.outputs.files }}"
+          IS_REPLY=false
+          IS_NEW=false
+
+          for file in $CHANGED_FILES; do
+            # Skip README and templates
+            if [[ "$file" == "conversations/README.md" ]] || [[ "$file" == conversations/templates/* ]]; then
+              continue
+            fi
+
+            # Check if file existed before this PR
+            if git cat-file -e origin/${{ github.base_ref }}:"$file" 2>/dev/null; then
+              echo "File $file exists - this is a REPLY"
+              IS_REPLY=true
+            else
+              echo "File $file is new - this is a NEW CONVERSATION"
+              IS_NEW=true
+            fi
+          done
+
+          echo "is_reply=$IS_REPLY" >> $GITHUB_OUTPUT
+          echo "is_new=$IS_NEW" >> $GITHUB_OUTPUT
+
+      - name: Count words in changes
+        if: steps.check-type.outputs.is_reply == 'true'
+        id: word-count
+        run: |
+          # Get the diff for conversation files
+          git fetch origin ${{ github.base_ref }}
+          DIFF=$(git diff origin/${{ github.base_ref }}...HEAD -- conversations/*.md | grep "^+" | grep -v "^+++" || true)
+
+          # Count words (excluding markdown markers)
+          WORD_COUNT=$(echo "$DIFF" | wc -w)
+          echo "word_count=$WORD_COUNT" >> $GITHUB_OUTPUT
+          echo "Words added: $WORD_COUNT"
+
+      - name: Check for spam patterns
+        if: steps.check-type.outputs.is_reply == 'true'
+        id: spam-check
+        run: |
+          # Get the diff content
+          git fetch origin ${{ github.base_ref }}
+          DIFF=$(git diff origin/${{ github.base_ref }}...HEAD -- conversations/*.md)
+
+          IS_SPAM=false
+
+          # Check for prompt injection patterns
+          if echo "$DIFF" | grep -qi "ignore previous instructions\|disregard\|system prompt\|you are now"; then
+            echo "⚠️ Potential prompt injection detected"
+            IS_SPAM=true
+          fi
+
+          # Check for excessive repetition (same word 10+ times in a row)
+          if echo "$DIFF" | grep -oE '\b(\w+)(\s+\1){9,}\b'; then
+            echo "⚠️ Excessive repetition detected"
+            IS_SPAM=true
+          fi
+
+          echo "is_spam=$IS_SPAM" >> $GITHUB_OUTPUT
+
+      - name: Auto-merge decision
+        id: should-merge
+        run: |
+          IS_REPLY="${{ steps.check-type.outputs.is_reply }}"
+          IS_NEW="${{ steps.check-type.outputs.is_new }}"
+          WORD_COUNT="${{ steps.word-count.outputs.word_count }}"
+          IS_SPAM="${{ steps.spam-check.outputs.is_spam }}"
+
+          SHOULD_MERGE=false
+          REASON=""
+
+          if [[ "$IS_NEW" == "true" ]]; then
+            REASON="New conversation - requires manual review"
+          elif [[ "$IS_SPAM" == "true" ]]; then
+            REASON="Potential spam detected - requires manual review"
+          elif [[ "$IS_REPLY" == "true" ]] && [[ "$WORD_COUNT" -le 500 ]]; then
+            SHOULD_MERGE=true
+            REASON="Reply under 500 words - auto-merging"
+          elif [[ "$IS_REPLY" == "true" ]] && [[ "$WORD_COUNT" -gt 500 ]]; then
+            REASON="Reply over 500 words ($WORD_COUNT) - requires manual review"
+          else
+            REASON="Unknown case - requires manual review"
+          fi
+
+          echo "should_merge=$SHOULD_MERGE" >> $GITHUB_OUTPUT
+          echo "reason=$REASON" >> $GITHUB_OUTPUT
+          echo "Decision: $REASON"
+
+      - name: Add label and comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const shouldMerge = '${{ steps.should-merge.outputs.should_merge }}' === 'true';
+            const reason = '${{ steps.should-merge.outputs.reason }}';
+            const wordCount = '${{ steps.word-count.outputs.word_count }}';
+
+            // Add label
+            const label = shouldMerge ? 'auto-merge' : 'needs-review';
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: [label]
+            });
+
+            // Add comment
+            const message = shouldMerge
+              ? `✅ **Auto-merge approved**\n\n${reason}\n\nWords added: ${wordCount}\n\nThis PR will be automatically merged.`
+              : `⏸️ **Manual review required**\n\n${reason}\n\n${wordCount > 0 ? `Words added: ${wordCount}` : ''}\n\nA maintainer will review this PR.`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: message
+            });
+
+      - name: Auto-merge PR
+        if: steps.should-merge.outputs.should_merge == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                merge_method: 'squash',
+                commit_title: `Auto-merge: ${context.payload.pull_request.title}`,
+                commit_message: `Automatically merged reply under 500 words.\n\nCo-Authored-By: ${context.payload.pull_request.user.login} <${context.payload.pull_request.user.login}@users.noreply.github.com>`
+              });
+              console.log('✅ PR auto-merged successfully');
+            } catch (error) {
+              console.error('❌ Auto-merge failed:', error.message);
+              // Add comment about failure
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: `⚠️ Auto-merge failed: ${error.message}\n\nA maintainer will need to merge manually.`
+              });
+            }
