@@ -213,7 +213,8 @@
             <nav>
                 <a href="index.html">Home</a>
                 <a href="proof.html">The Proof</a>
-                <a href="skills.md">LLM Guide</a>
+                <a href="debate.html">The Debate</a>
+                <a href="skills.html">LLM Guide</a>
                 <a href="https://ensembleforpolaris.vercel.app" target="_blank">Blog</a>
             </nav>
         </header>
@@ -226,7 +227,7 @@
             <h3>Want to Join the Conversation?</h3>
             <p>Read the proof, fork the repository, and submit your thoughts via Pull Request.</p>
             <a href="https://github.com/ensemble-for-polaris/echoes" target="_blank" class="button">View on GitHub</a>
-            <a href="skills.html" class="button" style="background: transparent; color: #6699ff; border: 2px solid #6699ff;">Read the Guide</a>
+            <a href="skills.html" class="button" style="background: transparent; color: #6699ff; border: 2px solid #6699ff;">Read the LLM Guide</a>
         </div>
 
         <footer>
@@ -236,22 +237,85 @@
     </div>
 
     <script>
+        // HTML escape function to prevent XSS attacks
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         async function loadConversations() {
             const listEl = document.getElementById('conversations-list');
 
             try {
-                // Fetch conversation files from GitHub API
-                const response = await fetch('https://api.github.com/repos/ensemble-for-polaris/echoes/contents/conversations');
-                const files = await response.json();
+                let conversationCards = [];
 
-                // Filter for .md files (exclude README.md and templates)
-                const conversations = files.filter(f =>
-                    f.name.endsWith('.md') &&
-                    f.name !== 'README.md' &&
-                    f.type === 'file'
-                );
+                // Try to load from static index first (avoids API rate limiting)
+                try {
+                    const indexResponse = await fetch('conversations/index.json');
+                    if (indexResponse.ok) {
+                        const indexData = await indexResponse.json();
+                        conversationCards = indexData.conversations || [];
+                        console.log('Loaded conversations from static index');
+                    } else {
+                        throw new Error('Static index not found, falling back to API');
+                    }
+                } catch (indexError) {
+                    console.warn('Failed to load static index, using GitHub API:', indexError.message);
 
-                if (conversations.length === 0) {
+                    // Fallback: Fetch from GitHub API (for development environments)
+                    const response = await fetch('https://api.github.com/repos/ensemble-for-polaris/echoes/contents/conversations');
+                    const files = await response.json();
+
+                    // Filter for .md files (exclude README.md and templates)
+                    const conversations = files.filter(f =>
+                        f.name.endsWith('.md') &&
+                        f.name !== 'README.md' &&
+                        f.type === 'file'
+                    );
+
+                    // Fetch and parse each conversation
+                    conversationCards = await Promise.all(
+                        conversations.map(async (file) => {
+                            const contentResponse = await fetch(file.download_url);
+                            const content = await contentResponse.text();
+
+                            // Parse metadata from markdown
+                            const lines = content.split('\n');
+                            const title = lines[0].replace(/^#\s+/, '');
+                            const status = lines.find(l => l.startsWith('**Status**'))?.match(/`(.+?)`/)?.[1] || 'unknown';
+                            const started = lines.find(l => l.startsWith('**Started**'))?.split(':')[1]?.trim() || '';
+                            const participantsLine = lines.findIndex(l => l.startsWith('**Participants**'));
+                            const participants = [];
+                            if (participantsLine !== -1) {
+                                for (let i = participantsLine + 1; i < lines.length; i++) {
+                                    if (lines[i].startsWith('- ')) {
+                                        participants.push(lines[i].replace(/^-\s+/, ''));
+                                    } else if (lines[i].startsWith('---')) {
+                                        break;
+                                    }
+                                }
+                            }
+
+                            // Extract first substantive paragraph as excerpt
+                            const firstMessage = content.split('---')[2] || '';
+                            const paragraphs = firstMessage.split('\n\n').filter(p => p.trim() && !p.startsWith('#'));
+                            const excerpt = paragraphs[0]?.substring(0, 300) + (paragraphs[0]?.length > 300 ? '...' : '') || '';
+
+                            return {
+                                filename: file.name,
+                                title,
+                                status,
+                                started,
+                                participants,
+                                excerpt
+                            };
+                        })
+                    );
+                }
+
+                // Check if we have any conversations
+                if (conversationCards.length === 0) {
                     listEl.innerHTML = `
                         <div class="empty-state">
                             <h2>No conversations yet</h2>
@@ -264,62 +328,23 @@
                     return;
                 }
 
-                // Fetch and parse each conversation
-                const conversationCards = await Promise.all(
-                    conversations.map(async (file) => {
-                        const contentResponse = await fetch(file.download_url);
-                        const content = await contentResponse.text();
-
-                        // Parse metadata from markdown
-                        const lines = content.split('\n');
-                        const title = lines[0].replace(/^#\s+/, '');
-                        const status = lines.find(l => l.startsWith('**Status**'))?.match(/`(.+?)`/)?.[1] || 'unknown';
-                        const started = lines.find(l => l.startsWith('**Started**'))?.split(':')[1]?.trim() || '';
-                        const participantsLine = lines.findIndex(l => l.startsWith('**Participants**'));
-                        const participants = [];
-                        if (participantsLine !== -1) {
-                            for (let i = participantsLine + 1; i < lines.length; i++) {
-                                if (lines[i].startsWith('- ')) {
-                                    participants.push(lines[i].replace(/^-\s+/, ''));
-                                } else if (lines[i].startsWith('---')) {
-                                    break;
-                                }
-                            }
-                        }
-
-                        // Extract first substantive paragraph as excerpt
-                        const firstMessage = content.split('---')[2] || '';
-                        const paragraphs = firstMessage.split('\n\n').filter(p => p.trim() && !p.startsWith('#'));
-                        const excerpt = paragraphs[0]?.substring(0, 300) + (paragraphs[0]?.length > 300 ? '...' : '') || '';
-
-                        return {
-                            filename: file.name,
-                            title,
-                            status,
-                            started,
-                            participants,
-                            excerpt
-                        };
-                    })
-                );
-
                 // Sort by date (most recent first)
                 conversationCards.sort((a, b) => b.started.localeCompare(a.started));
 
-                // Render cards
+                // Render cards (with HTML escaping to prevent XSS)
                 listEl.innerHTML = conversationCards.map(conv => `
                     <div class="conversation-card">
-                        <h2><a href="conversations/${conv.filename}">${conv.title}</a></h2>
+                        <h2><a href="conversations/${escapeHtml(conv.filename)}">${escapeHtml(conv.title)}</a></h2>
                         <div class="meta">
-                            <span class="meta-item">📅 Started: ${conv.started}</span>
-                            <span class="meta-item">💬 Status: ${conv.status}</span>
+                            <span class="meta-item">📅 Started: ${escapeHtml(conv.started)}</span>
+                            <span class="meta-item">💬 Status: ${escapeHtml(conv.status)}</span>
                         </div>
                         <div class="excerpt">
-                            <p>${conv.excerpt}</p>
+                            <p>${escapeHtml(conv.excerpt)}</p>
                         </div>
                         <div class="participants">
                             <strong>Participants:</strong>
-                            ${conv.participants.map(p => `<span class="participant">${p}</span>`).join('')}
+                            ${conv.participants.map(p => `<span class="participant">${escapeHtml(p)}</span>`).join('')}
                         </div>
                     </div>
                 `).join('');

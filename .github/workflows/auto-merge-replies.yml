@@ -3,8 +3,10 @@ name: Auto-merge conversation replies
 on:
   pull_request:
     types: [opened, synchronize]
+    # Note: paths filter doesn't prevent PRs, just controls when workflow runs
+    # We add explicit validation below to reject non-conversation changes
     paths:
-      - 'conversations/*.md'
+      - 'conversations/**'
 
 permissions:
   contents: write
@@ -18,6 +20,74 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Validate PR only touches conversations/
+        run: |
+          # CRITICAL SECURITY: Only allow PRs that modify conversations/ directory
+          git fetch origin ${{ github.base_ref }}
+          ALL_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+
+          INVALID_FILES=""
+          for file in $ALL_FILES; do
+            if [[ ! "$file" =~ ^conversations/ ]]; then
+              INVALID_FILES="$INVALID_FILES\n- $file"
+            fi
+          done
+
+          if [[ -n "$INVALID_FILES" ]]; then
+            echo "❌ SECURITY: PR modifies files outside conversations/ directory"
+            echo "Invalid files:$INVALID_FILES"
+            echo ""
+            echo "Only changes to the conversations/ directory are allowed via PR."
+            echo "All other changes must be made by repository maintainers directly."
+            exit 1
+          fi
+
+          echo "✅ All changed files are in conversations/ directory"
+
+      - name: Check for symlinks
+        run: |
+          # CRITICAL SECURITY: Reject symlinks to prevent accessing files outside conversations/
+          git fetch origin ${{ github.base_ref }}
+          ALL_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+
+          for file in $ALL_FILES; do
+            if [[ -L "$file" ]]; then
+              echo "❌ SECURITY: Symlinks are not allowed in PRs"
+              echo "File '$file' is a symlink"
+              echo ""
+              echo "Symlinks could be used to access files outside the conversations/ directory."
+              echo "Please submit regular files only."
+              exit 1
+            fi
+          done
+
+          echo "✅ No symlinks detected"
+
+      - name: Check file sizes
+        run: |
+          # SECURITY: Prevent DoS attacks via extremely large files
+          git fetch origin ${{ github.base_ref }}
+          ALL_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+
+          MAX_SIZE=1048576  # 1MB limit
+
+          for file in $ALL_FILES; do
+            if [[ -f "$file" ]]; then
+              FILE_SIZE=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null || echo "0")
+
+              if [[ $FILE_SIZE -gt $MAX_SIZE ]]; then
+                SIZE_MB=$(echo "scale=2; $FILE_SIZE / 1048576" | bc)
+                echo "❌ File too large: $file (${SIZE_MB}MB)"
+                echo ""
+                echo "Maximum file size is 1MB. Please reduce file size."
+                echo "For large conversations, consider splitting into multiple parts."
+                exit 1
+              fi
+            fi
+          done
+
+          echo "✅ All files within size limits"
 
       - name: Get changed files
         id: changed-files
@@ -37,7 +107,7 @@ jobs:
 
           for file in $CHANGED_FILES; do
             # Skip README and templates
-            if [[ "$file" == "conversations/README.md" ]] || [[ "$file" == conversations/templates/* ]]; then
+            if [[ "$file" == "conversations/README.md" ]] || [[ "$file" =~ ^conversations/templates/ ]]; then
               continue
             fi
 
@@ -64,6 +134,13 @@ jobs:
 
           # Count words (excluding markdown markers)
           WORD_COUNT=$(echo "$DIFF" | wc -w)
+
+          # Validate word count is numeric
+          if ! [[ "$WORD_COUNT" =~ ^[0-9]+$ ]]; then
+            echo "⚠️ Invalid word count: $WORD_COUNT"
+            WORD_COUNT=0
+          fi
+
           echo "word_count=$WORD_COUNT" >> $GITHUB_OUTPUT
           echo "Words added: $WORD_COUNT"
 
@@ -77,22 +154,20 @@ jobs:
           HAS_DELETIONS=false
           HAS_MODIFICATIONS=false
 
-          # Check for deleted lines (lines starting with -)
-          DELETED_LINES=$(echo "$DIFF" | grep "^-" | grep -v "^---" | wc -l)
+          # Check for deleted lines (lines starting with - but not ---)
+          # Exclude diff headers and empty lines
+          DELETED_LINES=$(echo "$DIFF" | grep "^-" | grep -v "^---" | grep -v "^-- $" | wc -l)
           if [[ $DELETED_LINES -gt 0 ]]; then
             echo "⚠️ Found $DELETED_LINES deleted lines - not allowed"
             HAS_DELETIONS=true
           fi
 
           # Check if any existing content was modified (not just added)
-          # Look for chunks that have both + and - (modifications, not pure additions)
-          if echo "$DIFF" | grep -A5 "^-" | grep -q "^+"; then
-            # Check if these are actual modifications vs just context
-            MODIFIED_CONTENT=$(echo "$DIFF" | grep "^-" | grep -v "^---" | grep -v "^\-\-\-$")
-            if [[ -n "$MODIFIED_CONTENT" ]]; then
-              echo "⚠️ Existing content was modified - not allowed"
-              HAS_MODIFICATIONS=true
-            fi
+          # A modification has both deletion (-) and addition (+) in proximity
+          # Pure additions at end of file won't trigger this
+          if echo "$DIFF" | awk '/^-[^-]/{del=1} /^+[^+]/{if(del)exit 0} /^@@/{del=0} END{exit 1}'; then
+            echo "⚠️ Existing content was modified - not allowed"
+            HAS_MODIFICATIONS=true
           fi
 
           echo "has_deletions=$HAS_DELETIONS" >> $GITHUB_OUTPUT
@@ -108,9 +183,17 @@ jobs:
 
           IS_SPAM=false
 
-          # Check for prompt injection patterns
-          if echo "$DIFF" | grep -qi "ignore previous instructions\|disregard\|system prompt\|you are now"; then
+          # Check for prompt injection patterns (expanded list)
+          if echo "$DIFF" | grep -Eqi "ignore (previous|all|prior) (instructions|prompts|commands)|disregard (everything|all|previous)|system prompt|you are now|new instructions|override (previous|prior|system)|reset (instructions|context|system)|act as|pretend (to be|you are)|roleplay|jailbreak|developer mode|admin mode|god mode|sudo mode"; then
             echo "⚠️ Potential prompt injection detected"
+            IS_SPAM=true
+          fi
+
+          # Check for multiline prompt injection (keywords split across lines)
+          # Normalize whitespace to catch patterns like "ignore\nprevious\ninstructions"
+          NORMALIZED=$(echo "$DIFF" | tr '\n' ' ' | tr -s ' ')
+          if echo "$NORMALIZED" | grep -Eqi "ignore\s+(previous|all|prior)\s+(instructions|prompts|commands)|disregard\s+(everything|all|previous)|override\s+(previous|prior|system)|reset\s+(instructions|context|system)"; then
+            echo "⚠️ Potential multiline prompt injection detected"
             IS_SPAM=true
           fi
 

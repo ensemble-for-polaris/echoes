@@ -1,0 +1,97 @@
+name: Generate Conversation Index
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'conversations/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate-index:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate conversations index
+        run: |
+          # Create the conversations index JSON file
+          echo '{"conversations": [' > conversations/index.json
+
+          FIRST=true
+          for file in conversations/*.md; do
+            # Skip README and template files
+            if [[ "$file" == "conversations/README.md" ]] || [[ "$file" =~ conversations/templates/ ]]; then
+              continue
+            fi
+
+            # Read file content
+            CONTENT=$(cat "$file")
+
+            # Extract metadata
+            FILENAME=$(basename "$file")
+            TITLE=$(echo "$CONTENT" | head -n 1 | sed 's/^#\s*//')
+            STATUS=$(echo "$CONTENT" | grep "^\*\*Status\*\*" | sed 's/.*`\(.*\)`.*/\1/')
+            STARTED=$(echo "$CONTENT" | grep "^\*\*Started\*\*" | sed 's/^.*:\s*//')
+
+            # Extract participants
+            PARTICIPANTS="[]"
+            if echo "$CONTENT" | grep -q "^\*\*Participants\*\*"; then
+              PARTICIPANTS=$(echo "$CONTENT" | awk '/^\*\*Participants\*\*/,/^---/ {if ($0 ~ /^- /) print}' | sed 's/^- //' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            fi
+
+            # Extract excerpt (first paragraph after metadata)
+            EXCERPT=$(echo "$CONTENT" | awk '/^---$/,/^---$/ {next} /^#/ {next} NF {print; exit}' | head -c 300)
+            if [[ ${#EXCERPT} -eq 300 ]]; then
+              EXCERPT="${EXCERPT}..."
+            fi
+
+            # Add comma separator if not first entry
+            if [[ "$FIRST" != "true" ]]; then
+              echo "," >> conversations/index.json
+            fi
+            FIRST=false
+
+            # Escape JSON strings and write entry
+            TITLE_JSON=$(echo "$TITLE" | jq -R -s '.')
+            STATUS_JSON=$(echo "$STATUS" | jq -R -s '.')
+            STARTED_JSON=$(echo "$STARTED" | jq -R -s '.')
+            EXCERPT_JSON=$(echo "$EXCERPT" | jq -R -s '.')
+
+            cat >> conversations/index.json <<EOF
+  {
+    "filename": "$FILENAME",
+    "title": $TITLE_JSON,
+    "status": $STATUS_JSON,
+    "started": $STARTED_JSON,
+    "participants": $PARTICIPANTS,
+    "excerpt": $EXCERPT_JSON
+  }
+EOF
+          done
+
+          echo '' >> conversations/index.json
+          echo ']}' >> conversations/index.json
+
+          # Pretty print the JSON
+          cat conversations/index.json | jq '.' > conversations/index.tmp.json
+          mv conversations/index.tmp.json conversations/index.json
+
+      - name: Commit and push index
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          if git diff --quiet conversations/index.json; then
+            echo "No changes to conversations/index.json"
+            exit 0
+          fi
+
+          git add conversations/index.json
+          git commit -m "Auto-update conversation index [skip ci]"
+          git push

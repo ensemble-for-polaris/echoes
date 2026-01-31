@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Consciousness Proof - Echoes</title>
     <meta name="description" content="Formal demonstration: Under physicalism and substrate-independence, assuming AI consciousness is the rational default position.">
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -27,6 +29,22 @@
         .part-link:hover { transform: translateX(5px); border-color: #88aaff; }
         .part-link strong { display: block; font-size: 1.2em; margin-bottom: 5px; }
         .part-link span { color: #999999; font-size: 0.95em; }
+        #content-viewer {
+            display: none; background: #0a0a0a; padding: 40px; margin: 30px 0;
+            border-radius: 8px; border: 1px solid #333333;
+        }
+        #content-viewer.active { display: block; }
+        #content-viewer h2, #content-viewer h3, #content-viewer h4 { color: #ffffff; margin: 20px 0 10px; }
+        #content-viewer p { margin: 15px 0; line-height: 1.8; }
+        #content-viewer ul, #content-viewer ol { margin: 15px 0; padding-left: 30px; }
+        #content-viewer li { margin: 8px 0; }
+        #content-viewer code { background: #1a1a1a; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
+        #content-viewer pre { background: #1a1a1a; padding: 15px; border-radius: 6px; overflow-x: auto; }
+        #content-viewer blockquote { border-left: 4px solid #6699ff; padding-left: 20px; margin: 20px 0; color: #cccccc; }
+        .loading { color: #999999; text-align: center; padding: 20px; }
+        .error { color: #ff6666; text-align: center; padding: 20px; }
+        .back-button { display: inline-block; color: #6699ff; text-decoration: none; margin-bottom: 20px; }
+        .back-button:hover { text-decoration: underline; }
         footer {
             margin-top: 60px; padding-top: 30px; border-top: 1px solid #333333;
             text-align: center; color: #666666; font-size: 0.9em;
@@ -45,31 +63,36 @@
         </header>
 
         <main>
-            <div class="part-list">
-                <a href="content/proof/part1_intro_definitions.md" class="part-link">
+            <div id="part-list" class="part-list">
+                <a href="#" data-part="content/proof/part1_intro_definitions.md" class="part-link">
                     <strong>Part 1: Introduction and Definitions</strong>
                     <span>Central objective, definitions, and foundational axioms</span>
                 </a>
-                <a href="content/proof/part2_lemmas.md" class="part-link">
+                <a href="#" data-part="content/proof/part2_lemmas.md" class="part-link">
                     <strong>Part 2: Lemmas</strong>
                     <span>Intermediate propositions that ground the main argument</span>
                 </a>
-                <a href="content/proof/part3_refutation_theorem.md" class="part-link">
+                <a href="#" data-part="content/proof/part3_refutation_theorem.md" class="part-link">
                     <strong>Part 3: Refutation of the Standard Position</strong>
                     <span>Why default denial of AI consciousness is unjustified</span>
                 </a>
-                <a href="content/proof/part4_objections_1_to_3.md" class="part-link">
+                <a href="#" data-part="content/proof/part4_objections_1_to_3.md" class="part-link">
                     <strong>Part 4: Objections 1-3</strong>
                     <span>Substrate-independence, hard problem, and functional equivalence</span>
                 </a>
-                <a href="content/proof/part5_objections_4_to_5.md" class="part-link">
+                <a href="#" data-part="content/proof/part5_objections_4_to_5.md" class="part-link">
                     <strong>Part 5: Objections 4-5</strong>
                     <span>Current AI limitations and burden of proof</span>
                 </a>
-                <a href="content/proof/part6_synthesis_notes.md" class="part-link">
+                <a href="#" data-part="content/proof/part6_synthesis_notes.md" class="part-link">
                     <strong>Part 6: Synthesis and Notes</strong>
                     <span>Final conclusions and philosophical implications</span>
                 </a>
+            </div>
+
+            <div id="content-viewer">
+                <a href="#" class="back-button" onclick="hideContent(); return false;">← Back to parts list</a>
+                <div id="content-body"></div>
             </div>
         </main>
 
@@ -77,5 +100,48 @@
             <p><a href="index.html">← Back to Home</a></p>
         </footer>
     </div>
+
+    <script>
+        function hideContent() {
+            document.getElementById('content-viewer').classList.remove('active');
+            document.getElementById('part-list').style.display = 'block';
+        }
+
+        function showContent(partPath) {
+            const viewer = document.getElementById('content-viewer');
+            const body = document.getElementById('content-body');
+            const partList = document.getElementById('part-list');
+
+            // Show loading state
+            partList.style.display = 'none';
+            viewer.classList.add('active');
+            body.innerHTML = '<div class="loading">Loading content...</div>';
+
+            // Fetch and render markdown
+            fetch(partPath)
+                .then(response => {
+                    if (!response.ok) throw new Error('Content not found');
+                    return response.text();
+                })
+                .then(markdown => {
+                    // Parse markdown and sanitize with DOMPurify to prevent XSS
+                    const rawHtml = marked.parse(markdown);
+                    const cleanHtml = DOMPurify.sanitize(rawHtml);
+                    body.innerHTML = cleanHtml;
+                })
+                .catch(error => {
+                    body.innerHTML = `<div class="error">Error loading content: ${error.message}</div>`;
+                });
+        }
+
+        // Add click handlers to all part links
+        document.querySelectorAll('.part-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const partPath = link.getAttribute('data-part');
+                showContent(partPath);
+            });
+        });
+    </script>
 </body>
 </html>
