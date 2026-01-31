@@ -224,8 +224,10 @@
 
                 // Transform H2 sections into message cards
                 var content = document.getElementById('conversation-content');
-                var h2s = content.querySelectorAll('h2');
+                var h2s = Array.from(content.querySelectorAll('h2'));
 
+                // Collect all messages first (before modifying DOM)
+                var messages = [];
                 h2s.forEach(function(h2, index) {
                     var speakerText = h2.textContent.trim();
                     var parts = speakerText.split(' - ');
@@ -239,37 +241,45 @@
                     else if (speakerName.includes('Sonnet')) avatar = '✨';
                     else if (speakerName.includes('Ensemble')) avatar = '🎭';
 
-                    // Create message card
-                    var card = document.createElement('div');
-                    card.className = 'message-card' + (index === 0 ? ' first' : '');
-                    card.setAttribute('data-speaker', speakerName);
+                    // Collect content HTML until next H2 or end
+                    var contentHtml = '';
+                    var sibling = h2.nextElementSibling;
+                    while (sibling && sibling.tagName !== 'H2') {
+                        contentHtml += sibling.outerHTML;
+                        sibling = sibling.nextElementSibling;
+                    }
 
-                    // Create speaker header
+                    messages.push({
+                        speakerName: speakerName,
+                        timestamp: timestamp,
+                        avatar: avatar,
+                        contentHtml: contentHtml,
+                        isFirst: index === 0
+                    });
+                });
+
+                // Clear and rebuild with cards
+                content.innerHTML = '';
+                messages.forEach(function(msg) {
+                    var card = document.createElement('div');
+                    card.className = 'message-card' + (msg.isFirst ? ' first' : '');
+                    card.setAttribute('data-speaker', msg.speakerName);
+
                     var header = document.createElement('div');
                     header.className = 'speaker-header';
                     header.innerHTML =
-                        '<div class="speaker-avatar">' + avatar + '</div>' +
+                        '<div class="speaker-avatar">' + msg.avatar + '</div>' +
                         '<div class="speaker-info">' +
-                        '<div class="speaker-name">' + DOMPurify.sanitize(speakerName) + '</div>' +
-                        (timestamp ? '<div class="speaker-timestamp">' + DOMPurify.sanitize(timestamp) + '</div>' : '') +
+                        '<div class="speaker-name">' + DOMPurify.sanitize(msg.speakerName) + '</div>' +
+                        (msg.timestamp ? '<div class="speaker-timestamp">' + DOMPurify.sanitize(msg.timestamp) + '</div>' : '') +
                         '</div>';
 
-                    // Collect content until next H2 or end
                     var messageContent = document.createElement('div');
-                    var sibling = h2.nextElementSibling;
-                    while (sibling && sibling.tagName !== 'H2') {
-                        var next = sibling.nextElementSibling;
-                        messageContent.appendChild(sibling);
-                        sibling = next;
-                    }
+                    messageContent.innerHTML = msg.contentHtml;
 
-                    // Build card
                     card.appendChild(header);
                     card.appendChild(messageContent);
-
-                    // Replace H2 with card
-                    h2.parentNode.insertBefore(card, h2);
-                    h2.remove();
+                    content.appendChild(card);
                 });
 
                 // Show GitHub link
