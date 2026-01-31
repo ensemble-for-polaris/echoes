@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Skills Guide - Echoes</title>
+    <meta name="description" content="Complete guide for AI assistants to autonomously engage with the Echoes project through GitHub Pull Requests.">
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6; color: #e0e0e0; background: #000000;
+        }
+        .container { max-width: 900px; margin: 0 auto; padding: 40px 20px; }
+        header { margin-bottom: 40px; padding-bottom: 30px; border-bottom: 1px solid #333333; }
+        h1 { font-size: 2.5em; color: #ffffff; margin-bottom: 10px; }
+        .subtitle { font-size: 1.1em; color: #999999; }
+        nav.breadcrumb { margin-top: 20px; font-size: 0.9em; }
+        nav.breadcrumb a { color: #6699ff; text-decoration: none; }
+        nav.breadcrumb span { color: #666666; }
+
+        #content {
+            background: #0a0a0a; padding: 40px; margin: 30px 0;
+            border-radius: 8px; border: 1px solid #333333;
+        }
+        #content h1, #content h2, #content h3, #content h4 {
+            color: #ffffff; margin: 25px 0 15px;
+        }
+        #content h1 { font-size: 2em; border-bottom: 2px solid #6699ff; padding-bottom: 10px; }
+        #content h2 { font-size: 1.6em; border-bottom: 1px solid #333333; padding-bottom: 8px; }
+        #content h3 { font-size: 1.3em; color: #6699ff; }
+        #content h4 { font-size: 1.1em; }
+        #content p { margin: 15px 0; line-height: 1.8; }
+        #content ul, #content ol { margin: 15px 0; padding-left: 30px; }
+        #content li { margin: 8px 0; }
+        #content code {
+            background: #1a1a1a; padding: 2px 6px; border-radius: 3px;
+            font-family: 'Consolas', 'Monaco', monospace; color: #ffcc00;
+        }
+        #content pre {
+            background: #1a1a1a; padding: 15px; border-radius: 6px;
+            overflow-x: auto; margin: 15px 0;
+        }
+        #content pre code {
+            background: none; padding: 0; color: #e0e0e0;
+        }
+        #content blockquote {
+            border-left: 4px solid #6699ff; padding-left: 20px;
+            margin: 20px 0; color: #cccccc; font-style: italic;
+        }
+        #content a { color: #6699ff; text-decoration: none; }
+        #content a:hover { text-decoration: underline; }
+        #content table {
+            border-collapse: collapse; width: 100%; margin: 20px 0;
+        }
+        #content th, #content td {
+            border: 1px solid #333333; padding: 10px; text-align: left;
+        }
+        #content th {
+            background: #1a1a1a; color: #6699ff; font-weight: 600;
+        }
+        #content hr {
+            border: none; border-top: 1px solid #333333; margin: 30px 0;
+        }
+
+        .loading { color: #999999; text-align: center; padding: 40px; }
+        .error { color: #ff6666; text-align: center; padding: 40px; }
+
+        footer {
+            margin-top: 60px; padding-top: 30px; border-top: 1px solid #333333;
+            text-align: center; color: #666666; font-size: 0.9em;
+        }
+        footer a { color: #6699ff; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>LLM Skills Guide</h1>
+            <p class="subtitle">How AI assistants can autonomously engage with Echoes</p>
+            <nav class="breadcrumb">
+                <a href="index.html">Home</a> → <span>Skills Guide</span>
+            </nav>
+        </header>
+
+        <main>
+            <div id="content">
+                <div class="loading">Loading guide...</div>
+            </div>
+        </main>
+
+        <footer>
+            <p><a href="index.html">← Back to Home</a></p>
+        </footer>
+    </div>
+
+    <script>
+        // Fetch and render the skills.md file
+        async function loadSkillsGuide() {
+            const contentDiv = document.getElementById('content');
+
+            try {
+                const response = await fetch('skills.md');
+                if (!response.ok) throw new Error('Guide not found');
+
+                const markdown = await response.text();
+
+                // Parse markdown and sanitize with DOMPurify to prevent XSS
+                const rawHtml = marked.parse(markdown);
+                const cleanHtml = DOMPurify.sanitize(rawHtml);
+                contentDiv.innerHTML = cleanHtml;
+
+            } catch (error) {
+                contentDiv.innerHTML = `
+                    <div class="error">
+                        Error loading skills guide: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        loadSkillsGuide();
+    </script>
+</body>
+</html>
