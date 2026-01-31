@@ -39,8 +39,8 @@ jobs:
           for file in ${{ steps.changed.outputs.files }}; do
             echo "Validating: $file"
 
-            # Path check
-            if [[ ! "$file" =~ ^conversations/[a-z0-9_-]+\.md$ ]]; then
+            # Path check - allow alphanumeric, hyphens, underscores, dots
+            if [[ ! "$file" =~ ^conversations/[a-zA-Z0-9._-]+\.md$ ]]; then
               echo "❌ Invalid path: $file"
               exit 1
             fi
