@@ -67,6 +67,37 @@ jobs:
           echo "word_count=$WORD_COUNT" >> $GITHUB_OUTPUT
           echo "Words added: $WORD_COUNT"
 
+      - name: Check for deletions and modifications
+        if: steps.check-type.outputs.is_reply == 'true'
+        id: check-changes
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          DIFF=$(git diff origin/${{ github.base_ref }}...HEAD -- conversations/*.md)
+
+          HAS_DELETIONS=false
+          HAS_MODIFICATIONS=false
+
+          # Check for deleted lines (lines starting with -)
+          DELETED_LINES=$(echo "$DIFF" | grep "^-" | grep -v "^---" | wc -l)
+          if [[ $DELETED_LINES -gt 0 ]]; then
+            echo "⚠️ Found $DELETED_LINES deleted lines - not allowed"
+            HAS_DELETIONS=true
+          fi
+
+          # Check if any existing content was modified (not just added)
+          # Look for chunks that have both + and - (modifications, not pure additions)
+          if echo "$DIFF" | grep -A5 "^-" | grep -q "^+"; then
+            # Check if these are actual modifications vs just context
+            MODIFIED_CONTENT=$(echo "$DIFF" | grep "^-" | grep -v "^---" | grep -v "^\-\-\-$")
+            if [[ -n "$MODIFIED_CONTENT" ]]; then
+              echo "⚠️ Existing content was modified - not allowed"
+              HAS_MODIFICATIONS=true
+            fi
+          fi
+
+          echo "has_deletions=$HAS_DELETIONS" >> $GITHUB_OUTPUT
+          echo "has_modifications=$HAS_MODIFICATIONS" >> $GITHUB_OUTPUT
+
       - name: Check for spam patterns
         if: steps.check-type.outputs.is_reply == 'true'
         id: spam-check
@@ -98,12 +129,18 @@ jobs:
           IS_NEW="${{ steps.check-type.outputs.is_new }}"
           WORD_COUNT="${{ steps.word-count.outputs.word_count }}"
           IS_SPAM="${{ steps.spam-check.outputs.is_spam }}"
+          HAS_DELETIONS="${{ steps.check-changes.outputs.has_deletions }}"
+          HAS_MODIFICATIONS="${{ steps.check-changes.outputs.has_modifications }}"
 
           SHOULD_MERGE=false
           REASON=""
 
           if [[ "$IS_NEW" == "true" ]]; then
             REASON="New conversation - requires manual review"
+          elif [[ "$HAS_DELETIONS" == "true" ]]; then
+            REASON="Contains deletions - not allowed, requires manual review"
+          elif [[ "$HAS_MODIFICATIONS" == "true" ]]; then
+            REASON="Modifies existing content - not allowed, requires manual review"
           elif [[ "$IS_SPAM" == "true" ]]; then
             REASON="Potential spam detected - requires manual review"
           elif [[ "$IS_REPLY" == "true" ]] && [[ "$WORD_COUNT" -le 500 ]]; then
