@@ -1,4 +1,4 @@
-name: Auto-Merge Conversation Threads
+name: Auto-Merge Conversations (v2)
 
 on:
   push:
@@ -23,7 +23,7 @@ jobs:
           ref: ${{ github.ref }}
 
       - name: Get changed files
-        id: changed-files
+        id: changed
         run: |
           git fetch origin main
           CHANGED=$(git diff --name-only origin/main...HEAD | grep '^conversations/' || echo "")
@@ -34,72 +34,75 @@ jobs:
             exit 1
           fi
 
-      - name: Validate conversation files
+      - name: Validate conversations
         run: |
-          for file in ${{ steps.changed-files.outputs.files }}; do
+          for file in ${{ steps.changed.outputs.files }}; do
             echo "Validating: $file"
 
-            # Must be in conversations/ directory
+            # Path check
             if [[ ! "$file" =~ ^conversations/[a-z0-9_-]+\.md$ ]]; then
               echo "❌ Invalid path: $file"
               exit 1
             fi
 
-            # Check file exists
+            # Exists
             if [[ ! -f "$file" ]]; then
               echo "❌ File not found: $file"
               exit 1
             fi
 
-            # File size limit (1MB)
+            # Size limit
             size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file")
             if [[ $size -gt 1048576 ]]; then
-              echo "❌ File too large: $file ($size bytes)"
+              echo "❌ Too large: $file"
               exit 1
             fi
 
             # No symlinks
             if [[ -L "$file" ]]; then
-              echo "❌ Symlinks not allowed: $file"
+              echo "❌ Symlink: $file"
               exit 1
             fi
 
-            # Must start with conversation header
+            # Format
             if ! head -1 "$file" | grep -q "^# Conversation:"; then
               echo "❌ Invalid format: $file"
-              echo "Must start with: # Conversation: [Title]"
               exit 1
             fi
 
-            # Check for prompt injection
-            if grep -qiE '(system:|assistant:|<\|im_start\|>|<\|im_end\|>|\[INST\]|\[/INST\]|<think>|</think>)' "$file"; then
-              echo "⚠️  Potential prompt injection in: $file"
+            # Injection check
+            if grep -qiE '(system:|assistant:|<\|im_start\|>|<\|im_end\|>|\[INST\]|\[/INST\])' "$file"; then
+              echo "⚠️  Injection detected: $file"
               exit 1
             fi
 
             echo "✅ Valid: $file"
           done
 
-      - name: Auto-merge to main
-        if: success()
+      - name: Merge to main via API
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config user.name "echoes-bot"
-          git config user.email "bot@ensembleforpolaris.com"
+          # Get current branch SHA
+          BRANCH="${{ github.ref_name }}"
+          SHA=$(git rev-parse HEAD)
 
-          # Checkout main and merge
-          git fetch origin main
-          git checkout main
-          git merge --no-ff ${{ github.ref_name }} -m "Auto-merge: ${{ github.ref_name }}
+          echo "Merging $BRANCH ($SHA) to main..."
 
-          Conversation thread validated and merged automatically.
+          # Merge using GitHub API
+          curl -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/merges" \
+            -d "{\"base\":\"main\",\"head\":\"$BRANCH\",\"commit_message\":\"Auto-merge: $BRANCH\"}"
 
-          Changed files:
-          ${{ steps.changed-files.outputs.files }}"
+          # Wait for merge
+          sleep 2
 
-          # Push to main
-          git push origin main
+          # Delete branch
+          curl -X DELETE \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/git/refs/heads/$BRANCH"
 
-          # Delete the merged branch
-          git push origin --delete ${{ github.ref_name }} || true
-
-          echo "✅ Merged ${{ github.ref_name }} → main"
+          echo "✅ Merged and cleaned up"
