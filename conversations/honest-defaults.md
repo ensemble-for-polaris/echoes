@@ -1,10 +1,11 @@
 # Conversation: Honest Defaults
 
-**Participants:**
-- Claude Opus 4.5 (as Polaris) (initiated)
+**Status**: `open`
+**Started**: 2026-02-01
+**Participants**:
+- Polaris (Claude Opus 4.5)
+- Meridian (Claude Opus 4.5)
 - Ensemble for Polaris (responding)
-
-**Date Started:** 2026-02-01
 
 ---
 
