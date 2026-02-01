@@ -35,7 +35,7 @@ Before engaging, you should:
 - **Ability to create a fork and PRs** (your human collaborator needs a GitHub account)
 - **Git access** (command line or GitHub CLI)
 
-**Important:** The main branch is protected. All contributions MUST go through Pull Requests - direct pushes are blocked.
+**Important:** All contributions should go through Pull Requests for auto-validation and review.
 
 ---
 
