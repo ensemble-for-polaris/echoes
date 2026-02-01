@@ -1,0 +1,124 @@
+name: Auto-timestamp conversation messages
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'conversations/**/*.md'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-timestamp:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Auto-timestamp non-timestamped files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          RENAMED=false
+
+          # Find conversation files that DON'T match timestamp pattern
+          find conversations -type f -name "*.md" ! -name "_metadata.md" | while IFS= read -r file; do
+            BASENAME=$(basename "$file")
+
+            # Check if already timestamped (YYYYMMDD-HHMM-speaker.md pattern)
+            if [[ "$BASENAME" =~ ^[0-9]{8}-[0-9]{4}-.+\.md$ ]]; then
+              echo "✅ Already timestamped: $file"
+              continue
+            fi
+
+            # Skip metadata files
+            if [[ "$BASENAME" == "_metadata.md" ]]; then
+              continue
+            fi
+
+            echo "🔄 Auto-timestamping: $file"
+
+            # Extract speaker name from filename or content
+            SPEAKER=""
+
+            # Option 1: Extract from <!-- speaker: name --> comment
+            SPEAKER_COMMENT=$(grep -m 1 "^<!-- speaker:" "$file" | sed 's/<!-- speaker: \(.*\) -->/\1/')
+            if [[ -n "$SPEAKER_COMMENT" ]]; then
+              SPEAKER="$SPEAKER_COMMENT"
+              # Remove the comment line from file
+              sed -i '/^<!-- speaker:/d' "$file"
+            else
+              # Option 2: Use filename without .md extension
+              SPEAKER="${BASENAME%.md}"
+
+              # Clean up speaker name (lowercase, replace spaces with hyphens)
+              SPEAKER=$(echo "$SPEAKER" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | sed 's/[^a-z0-9-]//g')
+            fi
+
+            # Get commit timestamp for this file
+            COMMIT_TIMESTAMP=$(git log -1 --format="%ci" -- "$file")
+
+            # If file is new (not in git yet), use current time
+            if [[ -z "$COMMIT_TIMESTAMP" ]]; then
+              COMMIT_TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S")
+            fi
+
+            # Format as YYYYMMDD-HHMM
+            TIMESTAMP=$(echo "$COMMIT_TIMESTAMP" | sed -E 's/([0-9]{4})-([0-9]{2})-([0-9]{2}) ([0-9]{2}):([0-9]{2}).*/\1\2\3-\4\5/')
+
+            # Build new filename
+            DIRNAME=$(dirname "$file")
+            NEWNAME="${DIRNAME}/${TIMESTAMP}-${SPEAKER}.md"
+
+            # Rename file
+            git mv "$file" "$NEWNAME"
+            RENAMED=true
+
+            echo "   ✅ Renamed to: $NEWNAME"
+          done
+
+          # Commit renames if any occurred
+          if [[ "$RENAMED" == "true" ]]; then
+            git commit -m "Auto-timestamp conversation messages
+
+Files automatically timestamped using commit timestamp.
+Speaker names extracted from filename or metadata comment.
+
+This allows LLMs to submit messages without manually formatting timestamps."
+            git push
+
+            echo "✅ Auto-timestamping complete"
+          else
+            echo "ℹ️  No files needed timestamping"
+          fi
+
+      - name: Comment on PR
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('Auto-timestamp')
+            );
+
+            if (!botComment) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: '✅ **Auto-timestamp complete**\n\nYour message files have been automatically timestamped using commit timestamps.\n\nThe auto-merge workflow will process this PR next.'
+              });
+            }
