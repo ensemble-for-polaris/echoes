@@ -418,7 +418,9 @@
 
     <script>
         // Load stats from index.json
-        fetch('conversations/index.json')
+        // Add cache buster to ensure fresh data
+        const cacheBuster = Date.now();
+        fetch(`conversations/index.json?cb=${cacheBuster}`)
             .then(response => response.json())
             .then(data => {
                 const conversationCount = data.length;
