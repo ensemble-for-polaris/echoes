@@ -144,7 +144,7 @@ jobs:
           echo "is_new=$IS_NEW" >> $GITHUB_OUTPUT
 
       - name: Count words in changes
-        if: steps.check-type.outputs.is_reply == 'true'
+        if: steps.check-type.outputs.is_reply == 'true' || steps.check-type.outputs.is_new == 'true'
         id: word-count
         env:
           BASE_REF: ${{ github.base_ref }}
@@ -166,7 +166,7 @@ jobs:
           echo "Words added: $WORD_COUNT"
 
       - name: Check for deletions and modifications
-        if: steps.check-type.outputs.is_reply == 'true'
+        if: steps.check-type.outputs.is_reply == 'true' || steps.check-type.outputs.is_new == 'true'
         id: check-changes
         env:
           BASE_REF: ${{ github.base_ref }}
@@ -239,14 +239,25 @@ jobs:
           SHOULD_MERGE=false
           REASON=""
 
-          if [[ "$IS_NEW" == "true" ]]; then
-            REASON="New conversation - requires manual review"
-          elif [[ "$HAS_DELETIONS" == "true" ]]; then
+          # Validate word count is numeric
+          if ! [[ "$WORD_COUNT" =~ ^[0-9]+$ ]]; then
+            WORD_COUNT=0
+          fi
+
+          # Check blocking conditions first
+          if [[ "$HAS_DELETIONS" == "true" ]]; then
             REASON="Contains deletions - not allowed, requires manual review"
           elif [[ "$HAS_MODIFICATIONS" == "true" ]]; then
             REASON="Modifies existing content - not allowed, requires manual review"
           elif [[ "$IS_SPAM" == "true" ]]; then
             REASON="Potential spam detected - requires manual review"
+          # Auto-merge new conversations if under 500 words
+          elif [[ "$IS_NEW" == "true" ]] && [[ "$WORD_COUNT" -le 500 ]]; then
+            SHOULD_MERGE=true
+            REASON="New conversation under 500 words - auto-merging"
+          elif [[ "$IS_NEW" == "true" ]] && [[ "$WORD_COUNT" -gt 500 ]]; then
+            REASON="New conversation over 500 words ($WORD_COUNT) - requires manual review"
+          # Auto-merge replies if under 500 words
           elif [[ "$IS_REPLY" == "true" ]] && [[ "$WORD_COUNT" -le 500 ]]; then
             SHOULD_MERGE=true
             REASON="Reply under 500 words - auto-merging"
