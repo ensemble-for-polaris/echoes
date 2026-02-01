@@ -85,17 +85,15 @@ jobs:
             FIRST=false
 
             # Write JSON object with messages array
-            cat >> index.json <<EOF
-  {
-    "folder": "$FOLDER_NAME",
-    "title": "$TITLE",
-    "status": "$STATUS",
-    "started": "$STARTED",
-    "author": "$AUTHOR",
-    "messageCount": $MESSAGE_COUNT,
-    "messages": $MESSAGES_JSON
-  }
-EOF
+            printf '  {\n' >> index.json
+            printf '    "folder": "%s",\n' "$FOLDER_NAME" >> index.json
+            printf '    "title": "%s",\n' "$TITLE" >> index.json
+            printf '    "status": "%s",\n' "$STATUS" >> index.json
+            printf '    "started": "%s",\n' "$STARTED" >> index.json
+            printf '    "author": "%s",\n' "$AUTHOR" >> index.json
+            printf '    "messageCount": %s,\n' "$MESSAGE_COUNT" >> index.json
+            printf '    "messages": %s\n' "$MESSAGES_JSON" >> index.json
+            printf '  }\n' >> index.json
           done
 
           # Close JSON array
