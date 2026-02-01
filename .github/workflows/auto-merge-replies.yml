@@ -309,7 +309,7 @@ jobs:
         if: steps.should-merge.outputs.should_merge == 'true'
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN }}
           script: |
             try {
               await github.rest.pulls.merge({
