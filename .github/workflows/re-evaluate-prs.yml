@@ -89,8 +89,8 @@ jobs:
                 }
               }
 
-              // Should auto-merge if <500 words
-              if (wordCount <= 500) {
+              // Should auto-merge if <5000 words
+              if (wordCount <= 5000) {
                 console.log(`  ✅ Should auto-merge (${wordCount} words)`);
 
                 // Remove needs-review label
@@ -160,7 +160,7 @@ jobs:
                   });
                 }
               } else {
-                console.log(`  ℹ️ Correctly labeled (${wordCount} words > 500)`);
+                console.log(`  ℹ️ Correctly labeled (${wordCount} words > 5000)`);
               }
             }
 

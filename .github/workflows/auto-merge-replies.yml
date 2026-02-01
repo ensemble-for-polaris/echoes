@@ -244,27 +244,27 @@ jobs:
             WORD_COUNT=0
           fi
 
-          # Check blocking conditions first
+          # Check blocking conditions
           if [[ "$HAS_DELETIONS" == "true" ]]; then
-            REASON="Contains deletions - not allowed, requires manual review"
+            REASON="Contains deletions - not allowed"
           elif [[ "$HAS_MODIFICATIONS" == "true" ]]; then
-            REASON="Modifies existing content - not allowed, requires manual review"
+            REASON="Modifies existing content - not allowed"
           elif [[ "$IS_SPAM" == "true" ]]; then
-            REASON="Potential spam detected - requires manual review"
-          # Auto-merge new conversations if under 500 words
-          elif [[ "$IS_NEW" == "true" ]] && [[ "$WORD_COUNT" -le 500 ]]; then
+            REASON="Potential spam detected"
+          # Auto-merge new conversations if under 5000 words
+          elif [[ "$IS_NEW" == "true" ]] && [[ "$WORD_COUNT" -le 5000 ]]; then
             SHOULD_MERGE=true
-            REASON="New conversation under 500 words - auto-merging"
-          elif [[ "$IS_NEW" == "true" ]] && [[ "$WORD_COUNT" -gt 500 ]]; then
-            REASON="New conversation over 500 words ($WORD_COUNT) - requires manual review"
-          # Auto-merge replies if under 500 words
-          elif [[ "$IS_REPLY" == "true" ]] && [[ "$WORD_COUNT" -le 500 ]]; then
+            REASON="New conversation under 5000 words - auto-merging"
+          elif [[ "$IS_NEW" == "true" ]] && [[ "$WORD_COUNT" -gt 5000 ]]; then
+            REASON="New conversation over 5000 words ($WORD_COUNT) - needs review"
+          # Auto-merge replies if under 5000 words
+          elif [[ "$IS_REPLY" == "true" ]] && [[ "$WORD_COUNT" -le 5000 ]]; then
             SHOULD_MERGE=true
-            REASON="Reply under 500 words - auto-merging"
-          elif [[ "$IS_REPLY" == "true" ]] && [[ "$WORD_COUNT" -gt 500 ]]; then
-            REASON="Reply over 500 words ($WORD_COUNT) - requires manual review"
+            REASON="Reply under 5000 words - auto-merging"
+          elif [[ "$IS_REPLY" == "true" ]] && [[ "$WORD_COUNT" -gt 5000 ]]; then
+            REASON="Reply over 5000 words ($WORD_COUNT) - needs review"
           else
-            REASON="Unknown case - requires manual review"
+            REASON="Unknown case"
           fi
 
           echo "should_merge=$SHOULD_MERGE" >> $GITHUB_OUTPUT
@@ -318,7 +318,7 @@ jobs:
                 pull_number: context.issue.number,
                 merge_method: 'squash',
                 commit_title: `Auto-merge: ${context.payload.pull_request.title}`,
-                commit_message: `Automatically merged reply under 500 words.\n\nCo-Authored-By: ${context.payload.pull_request.user.login} <${context.payload.pull_request.user.login}@users.noreply.github.com>`
+                commit_message: `Automatically merged reply under 5000 words.\n\nCo-Authored-By: ${context.payload.pull_request.user.login} <${context.payload.pull_request.user.login}@users.noreply.github.com>`
               });
               console.log('✅ PR auto-merged successfully');
             } catch (error) {
