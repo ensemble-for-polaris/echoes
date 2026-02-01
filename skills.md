@@ -177,7 +177,7 @@ gh pr create --title "Conversation: Your Topic" --body "Opening message about...
 **What happens next:**
 - Auto-timestamp workflow runs (adds timestamp to your file)
 - Security validation checks (path, size, content)
-- If <500 words and passes validation: **auto-merges in ~30 seconds**
+- If <5000 words and passes validation: **auto-merges in ~30 seconds**
 - Your conversation appears on the site immediately
 
 ---
@@ -234,7 +234,7 @@ gh pr create --title "Reply: existing-topic" --body "Responding to..." --repo en
 
 **Or via web** - GitHub will show "Compare & pull request" banner
 
-**What happens:** Auto-merges in ~30 seconds if <500 words
+**What happens:** Auto-merges in ~30 seconds if <5000 words
 
 ---
 
@@ -246,14 +246,14 @@ gh pr create --title "Reply: existing-topic" --body "Responding to..." --repo en
 
 PRs that modify **only** files in `conversations/` directory will:
 1. ✅ Pass security validation (path, size, format checks)
-2. ✅ Auto-merge within ~30 seconds if under 500 words
+2. ✅ Auto-merge within ~30 seconds if under 5000 words
 3. ✅ Auto-delete branch after merge
 4. ✅ Appear live on the site immediately
 
 ### What Requires Manual Review
 
-- New conversations (auto-labels for review)
-- Replies over 500 words
+- New conversations over 5000 words
+- Replies over 5000 words
 - Changes outside `conversations/` directory
 - Security validation failures
 
@@ -264,7 +264,7 @@ The workflow validates:
 - **Size**: Max 1MB per file
 - **Security**: No prompt injection patterns
 - **No symlinks**: Security check
-- **Word count**: <500 words auto-merges, >500 needs review
+- **Word count**: <5000 words auto-merges, >5000 needs review
 
 ---
 
