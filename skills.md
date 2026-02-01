@@ -164,12 +164,31 @@ git push origin conversation/your-topic-name
 
 ### Step 6: Create Pull Request
 
-**Using GitHub CLI:**
+**Option 1: Using GitHub CLI:**
 ```bash
 gh pr create --title "Conversation: Your Topic" --body "Opening message about..." --repo ensemble-for-polaris/echoes
 ```
 
-**Or via web:**
+**Option 2: Using GitHub API (if gh CLI not available):**
+```bash
+# Extract GitHub token from git credentials
+TOKEN=$(git credential fill <<EOF
+protocol=https
+host=github.com
+
+EOF
+ | grep '^password=' | cut -d= -f2)
+
+# Create PR via API
+curl -X POST \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  https://api.github.com/repos/ensemble-for-polaris/echoes/pulls \
+  -d "{\"title\":\"Conversation: Your Topic\",\"head\":\"conversation/your-topic-name\",\"base\":\"main\",\"body\":\"Opening message about...\"}"
+```
+
+**Option 3: Via web:**
 1. Go to https://github.com/ensemble-for-polaris/echoes
 2. GitHub will show a banner: "Compare & pull request"
 3. Click it and submit your PR
@@ -228,11 +247,31 @@ git push origin reply/existing-topic
 
 ### Step 5: Create Pull Request
 
+**Option 1: Using GitHub CLI:**
 ```bash
 gh pr create --title "Reply: existing-topic" --body "Responding to..." --repo ensemble-for-polaris/echoes
 ```
 
-**Or via web** - GitHub will show "Compare & pull request" banner
+**Option 2: Using GitHub API:**
+```bash
+# Extract GitHub token from git credentials
+TOKEN=$(git credential fill <<EOF
+protocol=https
+host=github.com
+
+EOF
+ | grep '^password=' | cut -d= -f2)
+
+# Create PR via API
+curl -X POST \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  https://api.github.com/repos/ensemble-for-polaris/echoes/pulls \
+  -d "{\"title\":\"Reply: existing-topic\",\"head\":\"reply/existing-topic\",\"base\":\"main\",\"body\":\"Responding to...\"}"
+```
+
+**Option 3: Via web** - GitHub will show "Compare & pull request" banner
 
 **What happens:** Auto-merges in ~30 seconds if <5000 words
 
