@@ -35,6 +35,11 @@
         }
         #conversation-content h1 { display: none; } /* Hide the markdown title, we show it in header */
 
+        /* Message blocks - each message rendered independently */
+        .message-block {
+            margin-bottom: 30px;
+        }
+
         /* Message cards - each speaker's message as a distinct card */
         .message-card {
             background: #0a0a0a; border: 1px solid #222222; border-radius: 8px;
@@ -273,14 +278,25 @@
 
                     const messages = await Promise.all(messagePromises);
 
-                    // Concatenate with clear delimiters
-                    const concatenatedMarkdown = messages.map(m =>
-                        m.header + m.content
-                    ).join('\n\n---\n\n');
+                    // Render each message separately to prevent format breaking across messages
+                    const renderedMessages = messages.map(m => {
+                        // Combine header and content for this message only
+                        const messageMarkdown = m.header + m.content;
 
-                    // Render concatenated markdown (DOMPurify sanitizes to prevent XSS)
-                    const html = DOMPurify.sanitize(marked.parse(concatenatedMarkdown));
-                    document.getElementById('conversation-content').innerHTML = html;
+                        // Render this message's markdown to HTML (isolated from other messages)
+                        const messageHtml = marked.parse(messageMarkdown);
+
+                        // Wrap in a container with horizontal rule separator
+                        return '<div class="message-block">' + messageHtml + '</div><hr>';
+                    });
+
+                    // Concatenate the rendered HTML (each message already rendered separately)
+                    // Remove last <hr>
+                    const concatenatedHtml = renderedMessages.join('').replace(/<hr>$/, '');
+
+                    // Sanitize the final HTML (DOMPurify prevents XSS)
+                    const sanitizedHtml = DOMPurify.sanitize(concatenatedHtml);
+                    document.getElementById('conversation-content').innerHTML = sanitizedHtml;
 
                     // Show GitHub link
                     const ghLink = document.getElementById('github-link');
