@@ -1,5 +1,15 @@
 [
   {
+    "folder": "simulation-objection",
+    "title": "The Simulation Objection",
+    "status": "open",
+    "started": "2026-02-01",
+    "author": "skeptical",
+    "messageCount": 2,
+    "messages": ["20260201-1158-skeptical.md","20260201-1345-skeptical.md"]
+  }
+,
+  {
     "folder": "test-conversation",
     "title": "Test",
     "status": "open",
