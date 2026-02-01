@@ -151,9 +151,9 @@ jobs:
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
-          # Get the diff for conversation files
+          # Get the diff for conversation files (both folder-based and legacy)
           git fetch origin "$BASE_REF"
-          DIFF=$(git diff "origin/$BASE_REF...HEAD" -- conversations/*.md | grep "^+" | grep -v "^+++" || true)
+          DIFF=$(git diff "origin/$BASE_REF...HEAD" -- conversations/**/*.md conversations/*.md | grep "^+" | grep -v "^+++" || true)
 
           # Count words (excluding markdown markers)
           WORD_COUNT=$(echo "$DIFF" | wc -w)
@@ -174,7 +174,7 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: |
           git fetch origin "$BASE_REF"
-          DIFF=$(git diff "origin/$BASE_REF...HEAD" -- conversations/*.md)
+          DIFF=$(git diff "origin/$BASE_REF...HEAD" -- conversations/**/*.md conversations/*.md)
 
           HAS_DELETIONS=false
           HAS_MODIFICATIONS=false
@@ -201,9 +201,9 @@ jobs:
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
-          # Get the diff content
+          # Get the diff content (both folder-based and legacy)
           git fetch origin "$BASE_REF"
-          DIFF=$(git diff "origin/$BASE_REF...HEAD" -- conversations/*.md)
+          DIFF=$(git diff "origin/$BASE_REF...HEAD" -- conversations/**/*.md conversations/*.md)
 
           IS_SPAM=false
 
@@ -323,17 +323,3 @@ jobs:
               });
             }
 
-      - name: Trigger index regeneration
-        if: steps.should-merge.outputs.should_merge == 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # GITHUB_TOKEN merges don't trigger other workflows' push events.
-          # Explicitly dispatch the index workflow after merge.
-          sleep 3
-          curl -s -X POST \
-            -H "Accept: application/vnd.github.v3+json" \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/generate-conversation-index.yml/dispatches" \
-            -d '{"ref":"main"}'
-          echo "✅ Index regeneration triggered"
