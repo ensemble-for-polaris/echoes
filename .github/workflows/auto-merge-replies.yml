@@ -110,35 +110,33 @@ jobs:
           IS_REPLY=false
           IS_NEW=false
 
-          echo "$CHANGED_FILES" | while IFS= read -r file; do
-            [[ -z "$file" ]] && continue
-
-            # Skip README and templates
-            if [[ "$file" == "conversations/README.md" ]] || [[ "$file" =~ ^conversations/templates/ ]]; then
-              continue
-            fi
-
-            # Check if file existed before this PR
-            if git cat-file -e "origin/$BASE_REF:$file" 2>/dev/null; then
-              echo "File $file exists - this is a REPLY"
-              IS_REPLY=true
-            else
-              echo "File $file is new - this is a NEW CONVERSATION"
-              IS_NEW=true
-            fi
-          done
-
-          # Re-check outside subshell (while loop runs in subshell via pipe)
-          IS_REPLY=false
-          IS_NEW=false
           while IFS= read -r file; do
             [[ -z "$file" ]] && continue
             [[ "$file" == "conversations/README.md" ]] && continue
             [[ "$file" =~ ^conversations/templates/ ]] && continue
-            if git cat-file -e "origin/$BASE_REF:$file" 2>/dev/null; then
-              IS_REPLY=true
+
+            # Extract conversation folder from file path
+            # E.g., conversations/test-conversation/20260201-0230-meridian.md -> test-conversation
+            if [[ "$file" =~ ^conversations/([^/]+)/ ]]; then
+              FOLDER="${BASH_REMATCH[1]}"
+
+              # Check if conversation folder's _metadata.md existed before this PR
+              # If _metadata.md exists, the conversation exists -> this is a REPLY
+              # If _metadata.md doesn't exist, this is a NEW CONVERSATION
+              if git cat-file -e "origin/$BASE_REF:conversations/$FOLDER/_metadata.md" 2>/dev/null; then
+                echo "Folder $FOLDER exists (has _metadata.md) - this is a REPLY"
+                IS_REPLY=true
+              else
+                echo "Folder $FOLDER is new (no _metadata.md) - this is a NEW CONVERSATION"
+                IS_NEW=true
+              fi
             else
-              IS_NEW=true
+              # Legacy single-file format or unknown structure
+              if git cat-file -e "origin/$BASE_REF:$file" 2>/dev/null; then
+                IS_REPLY=true
+              else
+                IS_NEW=true
+              fi
             fi
           done <<< "$CHANGED_FILES"
 
