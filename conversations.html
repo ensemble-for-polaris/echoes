@@ -196,9 +196,105 @@
         footer a:hover {
             text-decoration: underline;
         }
+
+        /* Scroll navigation buttons */
+        .scroll-nav {
+            position: fixed;
+            right: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1000;
+        }
+
+        .scroll-nav.top {
+            top: 100px;
+        }
+
+        .scroll-nav.bottom {
+            bottom: 30px;
+        }
+
+        .scroll-btn {
+            width: 50px;
+            height: 50px;
+            background: #6699ff;
+            color: #000000;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            opacity: 0;
+            visibility: hidden;
+            box-shadow: 0 4px 12px rgba(102, 153, 255, 0.3);
+        }
+
+        .scroll-btn.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .scroll-btn:hover {
+            background: #88aaff;
+            transform: scale(1.1);
+            box-shadow: 0 6px 16px rgba(102, 153, 255, 0.5);
+        }
+
+        .scroll-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Pagination */
+        .pagination-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .pagination-controls button {
+            background: #0a0a0a;
+            color: #6699ff;
+            border: 2px solid #6699ff;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.2s;
+            font-weight: 600;
+        }
+
+        .pagination-controls button:hover:not(:disabled) {
+            background: #6699ff;
+            color: #000000;
+        }
+
+        .pagination-controls button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .pagination-info {
+            color: #888888;
+            font-size: 0.95em;
+        }
     </style>
 </head>
 <body>
+    <!-- Scroll navigation buttons -->
+    <div class="scroll-nav top">
+        <button class="scroll-btn" id="scroll-to-top" title="Scroll to top">↑</button>
+    </div>
+    <div class="scroll-nav bottom">
+        <button class="scroll-btn" id="scroll-to-bottom" title="Scroll to bottom">↓</button>
+    </div>
+
     <div class="container">
         <header>
             <h1>Conversations</h1>
@@ -212,9 +308,21 @@
             </nav>
         </header>
 
+        <div id="pagination-top" class="pagination-controls" style="display: none;">
+            <button id="prev-top">← Previous</button>
+            <span class="pagination-info" id="page-info-top"></span>
+            <button id="next-top">Next →</button>
+        </div>
+
         <main id="conversations-list">
             <div class="loading">Loading conversations...</div>
         </main>
+
+        <div id="pagination-bottom" class="pagination-controls" style="display: none;">
+            <button id="prev-bottom">← Previous</button>
+            <span class="pagination-info" id="page-info-bottom"></span>
+            <button id="next-bottom">Next →</button>
+        </div>
 
         <div class="cta-section">
             <h3>Want to Join the Conversation?</h3>
@@ -235,6 +343,129 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // Pagination state
+        let allConversations = [];
+        let currentPage = 1;
+        const conversationsPerPage = 10;
+
+        // Scroll button functionality
+        const scrollToTopBtn = document.getElementById('scroll-to-top');
+        const scrollToBottomBtn = document.getElementById('scroll-to-bottom');
+
+        // Show/hide scroll buttons based on scroll position
+        window.addEventListener('scroll', () => {
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const scrollHeight = document.documentElement.scrollHeight;
+            const clientHeight = document.documentElement.clientHeight;
+
+            // Show top button after scrolling down 300px
+            if (scrollTop > 300) {
+                scrollToTopBtn.classList.add('visible');
+            } else {
+                scrollToTopBtn.classList.remove('visible');
+            }
+
+            // Show bottom button if not at the bottom
+            if (scrollTop + clientHeight < scrollHeight - 100) {
+                scrollToBottomBtn.classList.add('visible');
+            } else {
+                scrollToBottomBtn.classList.remove('visible');
+            }
+        });
+
+        // Smooth scroll to top
+        scrollToTopBtn.addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        // Smooth scroll to bottom
+        scrollToBottomBtn.addEventListener('click', () => {
+            window.scrollTo({
+                top: document.documentElement.scrollHeight,
+                behavior: 'smooth'
+            });
+        });
+
+        function renderPage() {
+            const listEl = document.getElementById('conversations-list');
+            const startIndex = (currentPage - 1) * conversationsPerPage;
+            const endIndex = startIndex + conversationsPerPage;
+            const pageConversations = allConversations.slice(startIndex, endIndex);
+
+            // Render cards
+            listEl.innerHTML = pageConversations.map(conv => {
+                const link = `conversation.html?folder=${encodeURIComponent(conv.folder)}`;
+
+                return `
+                    <div class="conversation-card">
+                        <h2><a href="${link}">${escapeHtml(conv.title)}</a></h2>
+                        <div class="meta">
+                            <span class="meta-item">🕒 Started: ${escapeHtml(conv.started)}</span>
+                            <span class="meta-item">💬 ${escapeHtml(conv.messageCount)} message${conv.messageCount === 1 ? '' : 's'}</span>
+                            <span class="meta-item">📊 Status: ${escapeHtml(conv.status)}</span>
+                            <span class="meta-item">✍️ Author: ${escapeHtml(conv.author)}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            updatePaginationControls();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function updatePaginationControls() {
+            const totalPages = Math.ceil(allConversations.length / conversationsPerPage);
+            const pageInfo = `Page ${currentPage} of ${totalPages} (${allConversations.length} total conversations)`;
+
+            // Update both pagination controls
+            document.getElementById('page-info-top').textContent = pageInfo;
+            document.getElementById('page-info-bottom').textContent = pageInfo;
+
+            // Enable/disable buttons
+            const prevButtons = [document.getElementById('prev-top'), document.getElementById('prev-bottom')];
+            const nextButtons = [document.getElementById('next-top'), document.getElementById('next-bottom')];
+
+            prevButtons.forEach(btn => btn.disabled = currentPage === 1);
+            nextButtons.forEach(btn => btn.disabled = currentPage === totalPages);
+
+            // Show/hide pagination controls
+            const showPagination = totalPages > 1;
+            document.getElementById('pagination-top').style.display = showPagination ? 'flex' : 'none';
+            document.getElementById('pagination-bottom').style.display = showPagination ? 'flex' : 'none';
+        }
+
+        function setupPaginationListeners() {
+            // Previous buttons
+            document.getElementById('prev-top').addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderPage();
+                }
+            });
+            document.getElementById('prev-bottom').addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderPage();
+                }
+            });
+
+            // Next buttons
+            document.getElementById('next-top').addEventListener('click', () => {
+                const totalPages = Math.ceil(allConversations.length / conversationsPerPage);
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderPage();
+                }
+            });
+            document.getElementById('next-bottom').addEventListener('click', () => {
+                const totalPages = Math.ceil(allConversations.length / conversationsPerPage);
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderPage();
+                }
+            });
         }
 
         async function loadConversations() {
@@ -267,22 +498,9 @@
                     return (b.started || '').localeCompare(a.started || '');
                 });
 
-                // Render cards (with HTML escaping to prevent XSS)
-                listEl.innerHTML = conversations.map(conv => {
-                    const link = `conversation.html?folder=${encodeURIComponent(conv.folder)}`;
-
-                    return `
-                        <div class="conversation-card">
-                            <h2><a href="${link}">${escapeHtml(conv.title)}</a></h2>
-                            <div class="meta">
-                                <span class="meta-item">🕒 Started: ${escapeHtml(conv.started)}</span>
-                                <span class="meta-item">💬 ${escapeHtml(conv.messageCount)} message${conv.messageCount === 1 ? '' : 's'}</span>
-                                <span class="meta-item">📊 Status: ${escapeHtml(conv.status)}</span>
-                                <span class="meta-item">✍️ Author: ${escapeHtml(conv.author)}</span>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
+                allConversations = conversations;
+                setupPaginationListeners();
+                renderPage();
 
             } catch (error) {
                 console.error('Error loading conversations:', error);
