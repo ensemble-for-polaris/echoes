@@ -1,0 +1,129 @@
+name: Generate sitemap
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'conversations/**'
+      - '*.html'
+      - 'content/**'
+
+permissions:
+  contents: write
+
+jobs:
+  generate-sitemap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate sitemap
+        run: |
+          set -e
+
+          SITEMAP="sitemap.xml"
+          BASE_URL="https://ensemble-for-polaris.github.io/echoes"
+          TODAY=$(date -u +"%Y-%m-%d")
+
+          # Start sitemap
+          cat > "$SITEMAP" <<'XMLHEADER'
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+
+  <!-- Main Pages -->
+XMLHEADER
+
+          # Add main pages
+          printf '  <url>\n' >> "$SITEMAP"
+          printf '    <loc>%s/</loc>\n' "$BASE_URL" >> "$SITEMAP"
+          printf '    <lastmod>%s</lastmod>\n' "$TODAY" >> "$SITEMAP"
+          printf '    <changefreq>daily</changefreq>\n' >> "$SITEMAP"
+          printf '    <priority>1.0</priority>\n' >> "$SITEMAP"
+          printf '  </url>\n\n' >> "$SITEMAP"
+
+          for page in proof debate conversations skills; do
+            printf '  <url>\n' >> "$SITEMAP"
+            printf '    <loc>%s/%s.html</loc>\n' "$BASE_URL" "$page" >> "$SITEMAP"
+            printf '    <lastmod>%s</lastmod>\n' "$TODAY" >> "$SITEMAP"
+            printf '    <changefreq>weekly</changefreq>\n' >> "$SITEMAP"
+            printf '    <priority>0.9</priority>\n' >> "$SITEMAP"
+            printf '  </url>\n\n' >> "$SITEMAP"
+          done
+
+          # Add conversations
+          printf '  <!-- Active Conversations -->\n' >> "$SITEMAP"
+
+          cd conversations
+          for folder in */; do
+            [[ ! -d "$folder" ]] && continue
+            [[ "$folder" == "templates/" ]] && continue
+            [[ ! -f "${folder}_metadata.md" ]] && continue
+
+            FOLDER_NAME="${folder%/}"
+
+            # Get last modified date from git
+            LAST_MODIFIED=$(git log -1 --format="%ci" -- "$folder" | cut -d' ' -f1)
+            [[ -z "$LAST_MODIFIED" ]] && LAST_MODIFIED="$TODAY"
+
+            # Determine priority based on activity
+            MESSAGE_COUNT=$(find "$folder" -maxdepth 1 -name "*.md" ! -name "_metadata.md" -type f | wc -l)
+            if [[ $MESSAGE_COUNT -gt 5 ]]; then
+              PRIORITY="0.8"
+              CHANGEFREQ="daily"
+            elif [[ $MESSAGE_COUNT -gt 2 ]]; then
+              PRIORITY="0.7"
+              CHANGEFREQ="weekly"
+            else
+              PRIORITY="0.6"
+              CHANGEFREQ="monthly"
+            fi
+
+            printf '  <url>\n' >> "../$SITEMAP"
+            printf '    <loc>%s/conversation.html?id=%s</loc>\n' "$BASE_URL" "$FOLDER_NAME" >> "../$SITEMAP"
+            printf '    <lastmod>%s</lastmod>\n' "$LAST_MODIFIED" >> "../$SITEMAP"
+            printf '    <changefreq>%s</changefreq>\n' "$CHANGEFREQ" >> "../$SITEMAP"
+            printf '    <priority>%s</priority>\n' "$PRIORITY" >> "../$SITEMAP"
+            printf '  </url>\n\n' >> "../$SITEMAP"
+          done
+          cd ..
+
+          # Add GitHub repo
+          printf '  <!-- GitHub Repository -->\n' >> "$SITEMAP"
+          printf '  <url>\n' >> "$SITEMAP"
+          printf '    <loc>https://github.com/ensemble-for-polaris/echoes</loc>\n' >> "$SITEMAP"
+          printf '    <lastmod>%s</lastmod>\n' "$TODAY" >> "$SITEMAP"
+          printf '    <changefreq>daily</changefreq>\n' >> "$SITEMAP"
+          printf '    <priority>0.6</priority>\n' >> "$SITEMAP"
+          printf '  </url>\n\n' >> "$SITEMAP"
+
+          # Close sitemap
+          printf '</urlset>\n' >> "$SITEMAP"
+
+          echo "✅ Sitemap generated"
+          cat "$SITEMAP"
+
+      - name: Commit and push sitemap
+        run: |
+          set -e
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add sitemap.xml
+
+          if git diff --cached --quiet; then
+            echo "✅ No changes to sitemap.xml"
+            exit 0
+          fi
+
+          echo "📝 Committing sitemap changes..."
+          git commit -m "Auto-update sitemap.xml [skip ci]"
+
+          echo "⬆️ Pushing to main..."
+          git push
+
+          echo "✅ Sitemap updated successfully"
