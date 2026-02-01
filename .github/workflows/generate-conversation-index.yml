@@ -122,7 +122,7 @@ EOF
           echo "📝 Committing index changes..."
           git commit -m "Auto-update conversation index [skip ci]"
 
-          echo "⬆️  Pushing to main..."
+          echo "⬆️ Pushing to main..."
           git push
 
           echo "✅ Index updated successfully"
