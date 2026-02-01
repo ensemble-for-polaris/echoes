@@ -284,38 +284,38 @@
                         const metadata = await metadataResponse.text();
                         const lines = metadata.split('\n');
                         const title = lines[0].replace(/^#\s*/, '').trim();
-                        const statusMatch = metadata.match(/\*\*Status\*\*:\s*`([^`]+)`/);
-                        const startedMatch = metadata.match(/\*\*Started\*\*:\s*(.+)/);
-                        const authorMatch = metadata.match(/\*\*Author\*\*:\s*(.+)/);
-                        const status = statusMatch ? statusMatch[1] : 'unknown';
-                        const started = startedMatch ? startedMatch[1].trim() : '';
-                        const author = authorMatch ? authorMatch[1].trim() : 'Unknown';
 
-                        // Get message count by listing folder contents
+                        // Get message files
                         const folderContentsResponse = await fetch(folder.url);
                         const folderContents = await folderContentsResponse.json();
                         const messageFiles = folderContents.filter(f =>
                             f.name.endsWith('.md') && f.name !== '_metadata.md'
                         );
                         const messageCount = messageFiles.length;
+                        const sortedMessages = messageFiles.map(f => f.name).sort();
 
-                        // Get first message for excerpt
-                        let excerpt = '';
-                        if (messageFiles.length > 0) {
-                            const sortedMessages = messageFiles.map(f => f.name).sort();
-                            const firstMessageUrl = `https://raw.githubusercontent.com/ensemble-for-polaris/echoes/main/conversations/${folder.name}/${sortedMessages[0]}`;
-                            const firstMessageResponse = await fetch(firstMessageUrl);
-                            if (firstMessageResponse.ok) {
-                                const firstMessageContent = await firstMessageResponse.text();
-                                const paragraphs = firstMessageContent.split('\n\n').filter(p => p.trim() && !p.startsWith('#'));
-                                excerpt = paragraphs[0]?.substring(0, 200) || '';
-                                if (paragraphs[0]?.length > 200) excerpt += '...';
+                        // Derive status (always open for now)
+                        const status = 'open';
+
+                        // Derive started date from first message filename (YYYYMMDD-HHMM-speaker.md)
+                        let started = '';
+                        if (sortedMessages.length > 0) {
+                            const dateStr = sortedMessages[0].substring(0, 8);
+                            started = `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+                        }
+
+                        // Derive author from first message filename (YYYYMMDD-HHMM-speaker.md)
+                        let author = 'Unknown';
+                        if (sortedMessages.length > 0) {
+                            const parts = sortedMessages[0].replace('.md', '').split('-');
+                            if (parts.length >= 3) {
+                                author = parts.slice(2).join(' '); // speaker part
                             }
                         }
 
                         // Get last modified from most recent message file
-                        const lastModified = messageFiles.length > 0
-                            ? messageFiles.map(f => f.name).sort().reverse()[0].substring(0, 8) // Extract YYYYMMDD from filename
+                        const lastModified = sortedMessages.length > 0
+                            ? sortedMessages[sortedMessages.length - 1].substring(0, 8) // Extract YYYYMMDD from filename
                             : started.replace(/-/g, '');
 
                         conversationCards.push({
@@ -325,7 +325,6 @@
                             started,
                             lastModified,
                             author,
-                            excerpt,
                             messageCount,
                             isFolder: true
                         });
@@ -342,17 +341,13 @@
 
                         const lines = content.split('\n');
                         const title = lines[0].replace(/^#\s*/, '').trim();
-                        const statusMatch = content.match(/\*\*Status\*\*:\s*`([^`]+)`/);
-                        const startedMatch = content.match(/\*\*Started\*\*:\s*(.+)/);
-                        const authorMatch = content.match(/\*\*Author\*\*:\s*(.+)/);
-                        const status = statusMatch ? statusMatch[1] : 'unknown';
-                        const started = startedMatch ? startedMatch[1].trim() : '';
-                        const author = authorMatch ? authorMatch[1].trim() : 'Unknown';
 
+                        // Legacy files - derive from content or use defaults
+                        const status = 'open';
+                        const startedMatch = content.match(/\*\*Started\*\*:\s*(.+)/);
+                        const started = startedMatch ? startedMatch[1].trim() : '';
+                        const author = 'Legacy'; // Could be improved by fetching from commits
                         const messageCount = (content.match(/^## /gm) || []).length;
-                        const firstMessage = content.split('---')[2] || '';
-                        const paragraphs = firstMessage.split('\n\n').filter(p => p.trim() && !p.startsWith('#'));
-                        const excerpt = paragraphs[0]?.substring(0, 200) || '';
 
                         conversationCards.push({
                             filename: file.name,
@@ -361,7 +356,6 @@
                             started,
                             lastModified: started,
                             author,
-                            excerpt: excerpt + (paragraphs[0]?.length > 200 ? '...' : ''),
                             messageCount,
                             isFolder: false
                         });

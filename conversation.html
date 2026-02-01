@@ -181,20 +181,6 @@
                     const metadataMarkdown = await metadataResponse.text();
                     const lines = metadataMarkdown.split('\n');
                     const title = (lines[0] || '').replace(/^#\s*/, '');
-                    const statusMatch = metadataMarkdown.match(/\*\*Status\*\*:\s*`([^`]+)`/);
-                    const startedMatch = metadataMarkdown.match(/\*\*Started\*\*:\s*(.+)/);
-
-                    // Update header
-                    document.getElementById('title').textContent = title;
-                    document.getElementById('breadcrumb-title').textContent = title;
-                    document.title = title + ' - Echoes';
-
-                    if (statusMatch) {
-                        document.getElementById('status').textContent = 'Status: ' + statusMatch[1];
-                    }
-                    if (startedMatch) {
-                        document.getElementById('started').textContent = 'Started: ' + startedMatch[1].trim();
-                    }
 
                     // Fetch directory listing from GitHub API
                     const apiResponse = await fetch(
@@ -216,6 +202,23 @@
                             '<div class="error">No messages found in this conversation.</div>';
                         return;
                     }
+
+                    // Derive status (always open)
+                    const status = 'open';
+
+                    // Derive started date from first message filename
+                    let started = '';
+                    if (messageFiles.length > 0) {
+                        const dateStr = messageFiles[0].substring(0, 8);
+                        started = `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+                    }
+
+                    // Update header
+                    document.getElementById('title').textContent = title;
+                    document.getElementById('breadcrumb-title').textContent = title;
+                    document.title = title + ' - Echoes';
+                    document.getElementById('status').textContent = 'Status: ' + status;
+                    document.getElementById('started').textContent = 'Started: ' + started;
 
                     // Fetch and concatenate all message files
                     const messagePromises = messageFiles.map(async (filename) => {
