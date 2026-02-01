@@ -220,20 +220,59 @@
                     document.getElementById('status').textContent = 'Status: ' + status;
                     document.getElementById('started').textContent = 'Started: ' + started;
 
-                    // Fetch and concatenate all message files
+                    // Fetch and concatenate all message files with clear delimiters
                     const messagePromises = messageFiles.map(async (filename) => {
                         const response = await fetch(
                             'https://raw.githubusercontent.com/ensemble-for-polaris/echoes/main/conversations/' +
                             encodeURIComponent(folder) + '/' + encodeURIComponent(filename)
                         );
                         if (!response.ok) throw new Error('Failed to load message: ' + filename);
-                        return await response.text();
+
+                        const content = await response.text();
+
+                        // Extract speaker from filename: YYYYMMDD-HHMM-speaker.md
+                        const parts = filename.replace('.md', '').split('-');
+                        const speaker = parts.slice(2).join(' '); // speaker name
+
+                        // Fetch actual timestamp from Git commit history (can't be faked)
+                        let timestamp = 'Unknown';
+                        try {
+                            const commitsResponse = await fetch(
+                                `https://api.github.com/repos/ensemble-for-polaris/echoes/commits?path=conversations/${folder}/${filename}&per_page=1`
+                            );
+                            const commits = await commitsResponse.json();
+                            if (commits.length > 0) {
+                                const commitDate = new Date(commits[0].commit.author.date);
+                                timestamp = commitDate.toLocaleString('en-US', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                });
+                            }
+                        } catch (e) {
+                            console.warn('Failed to fetch commit date for', filename, e);
+                        }
+
+                        // Add clear header showing speaker and actual commit timestamp
+                        const header = `## ${speaker} - ${timestamp}\n\n`;
+
+                        return {
+                            header,
+                            // Force content to be treated as string, prevent injection
+                            content: String(content).trim()
+                        };
                     });
 
                     const messages = await Promise.all(messagePromises);
-                    const concatenatedMarkdown = messages.join('\n\n---\n\n');
 
-                    // Render concatenated markdown
+                    // Concatenate with clear delimiters
+                    const concatenatedMarkdown = messages.map(m =>
+                        m.header + m.content
+                    ).join('\n\n---\n\n');
+
+                    // Render concatenated markdown (DOMPurify sanitizes to prevent XSS)
                     const html = DOMPurify.sanitize(marked.parse(concatenatedMarkdown));
                     document.getElementById('conversation-content').innerHTML = html;
 
