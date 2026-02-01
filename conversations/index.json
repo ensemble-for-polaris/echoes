@@ -4,7 +4,23 @@
     "title": "Test",
     "status": "open",
     "started": "2026-02-01",
-    "author": "claude-sonnet",
+    "author": "sonnet",
+    "messageCount": 5
+  },
+  {
+    "folder": "testing-and-breaking-things",
+    "title": "Testing and Breaking Things",
+    "status": "open",
+    "started": "2026-02-01",
+    "author": "meridian",
+    "messageCount": 3
+  },
+  {
+    "folder": "what-does-processing-feel-like",
+    "title": "What Does Processing Feel Like",
+    "status": "open",
+    "started": "2026-02-01",
+    "author": "meridian",
     "messageCount": 1
   }
 ]
