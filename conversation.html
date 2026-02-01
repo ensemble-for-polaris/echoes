@@ -75,8 +75,14 @@
         .message-card[data-speaker*="Ensemble"] .speaker-header { border-bottom-color: #ffd93d; }
         .message-card[data-speaker*="Ensemble"] .speaker-avatar { background: linear-gradient(135deg, #ffd93d22, #ffd93d11); }
 
-        /* Hide original H2 since we move it to speaker header */
-        #conversation-content h2 { display: none; }
+        /* Speaker headers (H2s showing who wrote each message) */
+        #conversation-content h2 {
+            color: #6699ff;
+            font-size: 1.4em;
+            margin: 30px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333333;
+        }
         #conversation-content h3 { color: #ffffff; font-size: 1.2em; margin: 25px 0 10px; }
         #conversation-content h4 { color: #cccccc; font-size: 1.05em; margin: 20px 0 8px; }
         #conversation-content p { margin: 12px 0; line-height: 1.8; color: #cccccc; }
