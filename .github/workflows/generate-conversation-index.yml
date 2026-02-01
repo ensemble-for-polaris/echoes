@@ -107,18 +107,22 @@ EOF
       - name: Commit and push index
         run: |
           set -e
-          set -x
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
           git add conversations/index.json
 
-          if git diff --staged --quiet; then
-            echo "✅ No changes to index.json"
+          # Check if there are actual changes
+          if git diff --cached --quiet; then
+            echo "✅ No changes to index.json (already up to date)"
             exit 0
           fi
 
+          echo "📝 Committing index changes..."
           git commit -m "Auto-update conversation index [skip ci]"
+
+          echo "⬆️  Pushing to main..."
           git push
 
-          echo "✅ Index updated and pushed"
+          echo "✅ Index updated successfully"

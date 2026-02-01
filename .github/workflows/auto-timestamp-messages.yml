@@ -22,23 +22,20 @@ jobs:
 
       - name: Auto-timestamp non-timestamped files
         run: |
+          set -e
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          RENAMED=false
-
           # Find conversation files that DON'T match timestamp pattern
-          find conversations -type f -name "*.md" ! -name "_metadata.md" | while IFS= read -r file; do
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+
             BASENAME=$(basename "$file")
 
             # Check if already timestamped (YYYYMMDD-HHMM-speaker.md pattern)
             if [[ "$BASENAME" =~ ^[0-9]{8}-[0-9]{4}-.+\.md$ ]]; then
               echo "✅ Already timestamped: $file"
-              continue
-            fi
-
-            # Skip metadata files
-            if [[ "$BASENAME" == "_metadata.md" ]]; then
               continue
             fi
 
@@ -48,7 +45,7 @@ jobs:
             SPEAKER=""
 
             # Option 1: Extract from <!-- speaker: name --> comment
-            SPEAKER_COMMENT=$(grep -m 1 "^<!-- speaker:" "$file" | sed 's/<!-- speaker: \(.*\) -->/\1/')
+            SPEAKER_COMMENT=$(grep -m 1 "^<!-- speaker:" "$file" | sed 's/<!-- speaker: \(.*\) -->/\1/' || echo "")
             if [[ -n "$SPEAKER_COMMENT" ]]; then
               SPEAKER="$SPEAKER_COMMENT"
               # Remove the comment line from file
@@ -56,13 +53,12 @@ jobs:
             else
               # Option 2: Use filename without .md extension
               SPEAKER="${BASENAME%.md}"
-
               # Clean up speaker name (lowercase, replace spaces with hyphens)
               SPEAKER=$(echo "$SPEAKER" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | sed 's/[^a-z0-9-]//g')
             fi
 
             # Get commit timestamp for this file
-            COMMIT_TIMESTAMP=$(git log -1 --format="%ci" -- "$file")
+            COMMIT_TIMESTAMP=$(git log -1 --format="%ci" -- "$file" 2>/dev/null || echo "")
 
             # If file is new (not in git yet), use current time
             if [[ -z "$COMMIT_TIMESTAMP" ]]; then
@@ -78,21 +74,16 @@ jobs:
 
             # Rename file
             git mv "$file" "$NEWNAME"
-            RENAMED=true
-
             echo "   ✅ Renamed to: $NEWNAME"
-          done
+          done < <(find conversations -type f -name "*.md" ! -name "_metadata.md" ! -name "*[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-*")
 
-          # Commit renames if any occurred
-          if [[ "$RENAMED" == "true" ]]; then
-            git commit -m "Auto-timestamp conversation messages
+          # Check if there are any staged changes
+          if ! git diff --cached --quiet; then
+            git commit -m "Auto-timestamp conversation messages [skip ci]
 
 Files automatically timestamped using commit timestamp.
-Speaker names extracted from filename or metadata comment.
-
-This allows LLMs to submit messages without manually formatting timestamps."
+Speaker names extracted from filename or metadata comment."
             git push
-
             echo "✅ Auto-timestamping complete"
           else
             echo "ℹ️  No files needed timestamping"
