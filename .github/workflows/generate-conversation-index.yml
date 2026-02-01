@@ -1,0 +1,98 @@
+name: Generate conversation index
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'conversations/**'
+
+permissions:
+  contents: write
+
+jobs:
+  generate-index:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate conversation index
+        run: |
+          cd conversations
+
+          # Start JSON array
+          echo '[' > index.json
+
+          FIRST=true
+
+          # Find all conversation folders (those with _metadata.md)
+          for folder in */; do
+            [[ ! -d "$folder" ]] && continue
+            [[ "$folder" == "templates/" ]] && continue
+            [[ ! -f "${folder}_metadata.md" ]] && continue
+
+            FOLDER_NAME="${folder%/}"
+
+            # Read title from _metadata.md (first line after # header)
+            TITLE=$(grep -m 1 '^# ' "${folder}_metadata.md" | sed 's/^# //' || echo "$FOLDER_NAME")
+
+            # Get list of message files (YYYYMMDD-HHMM-speaker.md)
+            MESSAGES=$(find "$folder" -maxdepth 1 -name "*.md" ! -name "_metadata.md" -type f | sort)
+            MESSAGE_COUNT=$(echo "$MESSAGES" | grep -c . || echo "0")
+
+            # Derive started date from first message
+            STARTED=""
+            AUTHOR="Unknown"
+            if [[ $MESSAGE_COUNT -gt 0 ]]; then
+              FIRST_MSG=$(echo "$MESSAGES" | head -n 1 | xargs basename)
+              # Extract date YYYYMMDD from filename
+              DATE_STR="${FIRST_MSG:0:8}"
+              STARTED="${DATE_STR:0:4}-${DATE_STR:4:2}-${DATE_STR:6:2}"
+
+              # Extract author from filename (everything after YYYYMMDD-HHMM-)
+              AUTHOR=$(echo "$FIRST_MSG" | sed -E 's/^[0-9]{8}-[0-9]{4}-(.+)\.md$/\1/')
+            fi
+
+            # Status is always "open" for now
+            STATUS="open"
+
+            # Add comma separator for all but first entry
+            if [[ "$FIRST" == "false" ]]; then
+              echo ',' >> index.json
+            fi
+            FIRST=false
+
+            # Write JSON object
+            cat >> index.json <<EOF
+  {
+    "folder": "$FOLDER_NAME",
+    "title": "$TITLE",
+    "status": "$STATUS",
+    "started": "$STARTED",
+    "author": "$AUTHOR",
+    "messageCount": $MESSAGE_COUNT
+  }
+EOF
+          done
+
+          # Close JSON array
+          echo '' >> index.json
+          echo ']' >> index.json
+
+          cat index.json
+
+      - name: Commit and push index
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add conversations/index.json
+
+          if git diff --staged --quiet; then
+            echo "No changes to index.json"
+          else
+            git commit -m "Auto-update conversation index"
+            git push
+          fi

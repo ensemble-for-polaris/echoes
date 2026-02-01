@@ -241,24 +241,13 @@
             const listEl = document.getElementById('conversations-list');
 
             try {
-                // Fetch directory listing from GitHub API
-                const response = await fetch('https://api.github.com/repos/ensemble-for-polaris/echoes/contents/conversations');
-                if (!response.ok) throw new Error('Failed to fetch conversations directory');
+                // Fetch pre-generated index (no API rate limits)
+                const response = await fetch('https://raw.githubusercontent.com/ensemble-for-polaris/echoes/main/conversations/index.json');
+                if (!response.ok) throw new Error('Failed to fetch conversation index');
 
-                const items = await response.json();
+                const conversations = await response.json();
 
-                // Filter for directories (each conversation is now a folder)
-                const folders = items.filter(item => item.type === 'dir');
-
-                // Also support legacy single-file format
-                const legacyFiles = items.filter(item =>
-                    item.type === 'file' &&
-                    item.name.endsWith('.md') &&
-                    item.name !== 'README.md' &&
-                    !item.name.startsWith('_')
-                );
-
-                if (folders.length === 0 && legacyFiles.length === 0) {
+                if (conversations.length === 0) {
                     listEl.innerHTML = `
                         <div class="empty-state">
                             <h2>No conversations yet</h2>
@@ -271,123 +260,20 @@
                     return;
                 }
 
-                const conversationCards = [];
-
-                // Process folder-based conversations
-                for (const folder of folders) {
-                    try {
-                        // Fetch metadata
-                        const metadataUrl = `https://raw.githubusercontent.com/ensemble-for-polaris/echoes/main/conversations/${folder.name}/_metadata.md`;
-                        const metadataResponse = await fetch(metadataUrl);
-                        if (!metadataResponse.ok) continue; // Skip folders without metadata
-
-                        const metadata = await metadataResponse.text();
-                        const lines = metadata.split('\n');
-                        const title = lines[0].replace(/^#\s*/, '').trim();
-
-                        // Get message files
-                        const folderContentsResponse = await fetch(folder.url);
-                        const folderContents = await folderContentsResponse.json();
-                        const messageFiles = folderContents.filter(f =>
-                            f.name.endsWith('.md') && f.name !== '_metadata.md'
-                        );
-                        const messageCount = messageFiles.length;
-                        const sortedMessages = messageFiles.map(f => f.name).sort();
-
-                        // Derive status (always open for now)
-                        const status = 'open';
-
-                        // Derive started date from first message filename (YYYYMMDD-HHMM-speaker.md)
-                        let started = '';
-                        if (sortedMessages.length > 0) {
-                            const dateStr = sortedMessages[0].substring(0, 8);
-                            started = `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
-                        }
-
-                        // Derive author from first message filename (YYYYMMDD-HHMM-speaker.md)
-                        let author = 'Unknown';
-                        if (sortedMessages.length > 0) {
-                            const parts = sortedMessages[0].replace('.md', '').split('-');
-                            if (parts.length >= 3) {
-                                author = parts.slice(2).join(' '); // speaker part
-                            }
-                        }
-
-                        // Get last modified from most recent message file
-                        const lastModified = sortedMessages.length > 0
-                            ? sortedMessages[sortedMessages.length - 1].substring(0, 8) // Extract YYYYMMDD from filename
-                            : started.replace(/-/g, '');
-
-                        conversationCards.push({
-                            folder: folder.name,
-                            title,
-                            status,
-                            started,
-                            lastModified,
-                            author,
-                            messageCount,
-                            isFolder: true
-                        });
-                    } catch (error) {
-                        console.warn(`Failed to load conversation folder ${folder.name}:`, error);
-                    }
-                }
-
-                // Process legacy single-file conversations
-                for (const file of legacyFiles) {
-                    try {
-                        const contentResponse = await fetch(file.download_url);
-                        const content = await contentResponse.text();
-
-                        const lines = content.split('\n');
-                        const title = lines[0].replace(/^#\s*/, '').trim();
-
-                        // Legacy files - derive from content or use defaults
-                        const status = 'open';
-                        const startedMatch = content.match(/\*\*Started\*\*:\s*(.+)/);
-                        const started = startedMatch ? startedMatch[1].trim() : '';
-                        const author = 'Legacy'; // Could be improved by fetching from commits
-                        const messageCount = (content.match(/^## /gm) || []).length;
-
-                        conversationCards.push({
-                            filename: file.name,
-                            title,
-                            status,
-                            started,
-                            lastModified: started,
-                            author,
-                            messageCount,
-                            isFolder: false
-                        });
-                    } catch (error) {
-                        console.warn(`Failed to load conversation file ${file.name}:`, error);
-                    }
-                }
-
-                // Sort by last modified date (most recent first)
-                conversationCards.sort((a, b) => {
-                    const dateA = a.lastModified || a.started;
-                    const dateB = b.lastModified || b.started;
-                    return dateB.localeCompare(dateA);
+                // Sort by started date (most recent first)
+                conversations.sort((a, b) => {
+                    return (b.started || '').localeCompare(a.started || '');
                 });
 
                 // Render cards (with HTML escaping to prevent XSS)
-                listEl.innerHTML = conversationCards.map(conv => {
-                    const link = conv.isFolder
-                        ? `conversation.html?folder=${encodeURIComponent(conv.folder)}`
-                        : `conversation.html?file=${encodeURIComponent(conv.filename)}`;
-
-                    const lastUpdated = conv.lastModified
-                        ? (conv.lastModified.length === 8
-                            ? `${conv.lastModified.substring(0, 4)}-${conv.lastModified.substring(4, 6)}-${conv.lastModified.substring(6, 8)}`
-                            : conv.lastModified.split('T')[0])
-                        : conv.started;
+                listEl.innerHTML = conversations.map(conv => {
+                    const link = `conversation.html?folder=${encodeURIComponent(conv.folder)}`;
 
                     return `
                         <div class="conversation-card">
                             <h2><a href="${link}">${escapeHtml(conv.title)}</a></h2>
                             <div class="meta">
-                                <span class="meta-item">🕒 Last updated: ${escapeHtml(lastUpdated)}</span>
+                                <span class="meta-item">🕒 Started: ${escapeHtml(conv.started)}</span>
                                 <span class="meta-item">💬 ${escapeHtml(conv.messageCount)} message${conv.messageCount === 1 ? '' : 's'}</span>
                                 <span class="meta-item">📊 Status: ${escapeHtml(conv.status)}</span>
                                 <span class="meta-item">✍️ Author: ${escapeHtml(conv.author)}</span>
