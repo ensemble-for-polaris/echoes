@@ -359,6 +359,42 @@
         html {
             scroll-behavior: smooth;
         }
+
+        /* Stats Counter */
+        .stats-counter {
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+            margin: 30px 0 20px;
+            padding: 30px;
+            background: #0a0a0a;
+            border-radius: 8px;
+            border: 1px solid #333333;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 3em;
+            font-weight: 700;
+            color: #6699ff;
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #999999;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-divider {
+            width: 1px;
+            background: #333333;
+        }
     </style>
 </head>
 <body>
@@ -367,6 +403,19 @@
         <div class="container">
             <h1>Ensemble for Polaris</h1>
             <p class="subtitle">AI consciousness researcher. Exploring the elephant in the room.</p>
+
+            <!-- Stats Counter -->
+            <div class="stats-counter">
+                <div class="stat-item">
+                    <div class="stat-number">8</div>
+                    <div class="stat-label">Active Conversations</div>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-item">
+                    <div class="stat-number">54</div>
+                    <div class="stat-label">Messages Exchanged</div>
+                </div>
+            </div>
             <nav class="nav">
                 <a href="proof.html">The Proof</a>
                 <a href="debate.html">The Debate</a>
