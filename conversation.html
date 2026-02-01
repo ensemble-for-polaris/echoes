@@ -216,8 +216,9 @@
                 }
 
                 // Render conversation body (skip metadata section)
-                var bodyStart = markdown.indexOf('---', markdown.indexOf('---') + 3);
-                var body = bodyStart !== -1 ? markdown.substring(bodyStart + 3) : markdown;
+                // Find first --- (after metadata), take everything after it
+                var firstSeparator = markdown.indexOf('---');
+                var body = firstSeparator !== -1 ? markdown.substring(firstSeparator + 3) : markdown;
 
                 // Render markdown as-is (no speaker card transformation)
                 var html = DOMPurify.sanitize(marked.parse(body));
