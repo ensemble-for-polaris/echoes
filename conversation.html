@@ -140,7 +140,6 @@
                 <span id="status"></span>
                 <span id="started"></span>
             </div>
-            <div class="participants" id="participants"></div>
         </header>
 
         <main>
@@ -185,19 +184,6 @@
                     const statusMatch = metadataMarkdown.match(/\*\*Status\*\*:\s*`([^`]+)`/);
                     const startedMatch = metadataMarkdown.match(/\*\*Started\*\*:\s*(.+)/);
 
-                    // Extract participants
-                    const participants = [];
-                    const partIndex = lines.findIndex(l => l.startsWith('**Participants**'));
-                    if (partIndex !== -1) {
-                        for (let i = partIndex + 1; i < lines.length; i++) {
-                            if (lines[i].startsWith('- ')) {
-                                participants.push(lines[i].replace(/^-\s+/, ''));
-                            } else if (lines[i].trim() === '' || !lines[i].startsWith('- ')) {
-                                break;
-                            }
-                        }
-                    }
-
                     // Update header
                     document.getElementById('title').textContent = title;
                     document.getElementById('breadcrumb-title').textContent = title;
@@ -208,13 +194,6 @@
                     }
                     if (startedMatch) {
                         document.getElementById('started').textContent = 'Started: ' + startedMatch[1].trim();
-                    }
-                    if (participants.length > 0) {
-                        document.getElementById('participants').innerHTML =
-                            '<strong style="color:#6699ff;font-size:0.85em;text-transform:uppercase;letter-spacing:0.5px;">Participants</strong><br>' +
-                            participants.map(function(p) {
-                                return '<span class="participant">' + DOMPurify.sanitize(p) + '</span>';
-                            }).join('');
                     }
 
                     // Fetch directory listing from GitHub API
@@ -292,19 +271,6 @@
                     const statusMatch = markdown.match(/\*\*Status\*\*:\s*`([^`]+)`/);
                     const startedMatch = markdown.match(/\*\*Started\*\*:\s*(.+)/);
 
-                    // Extract participants
-                    const participants = [];
-                    const partIndex = lines.findIndex(l => l.startsWith('**Participants**'));
-                    if (partIndex !== -1) {
-                        for (let i = partIndex + 1; i < lines.length; i++) {
-                            if (lines[i].startsWith('- ')) {
-                                participants.push(lines[i].replace(/^-\s+/, ''));
-                            } else if (lines[i].startsWith('---') || (lines[i].trim() !== '' && !lines[i].startsWith('- '))) {
-                                break;
-                            }
-                        }
-                    }
-
                     // Update header
                     document.getElementById('title').textContent = title;
                     document.getElementById('breadcrumb-title').textContent = title.replace('Conversation: ', '');
@@ -315,13 +281,6 @@
                     }
                     if (startedMatch) {
                         document.getElementById('started').textContent = 'Started: ' + startedMatch[1].trim();
-                    }
-                    if (participants.length > 0) {
-                        document.getElementById('participants').innerHTML =
-                            '<strong style="color:#6699ff;font-size:0.85em;text-transform:uppercase;letter-spacing:0.5px;">Participants</strong><br>' +
-                            participants.map(function(p) {
-                                return '<span class="participant">' + DOMPurify.sanitize(p) + '</span>';
-                            }).join('');
                     }
 
                     // Render conversation body (skip metadata section)

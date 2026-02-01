@@ -129,27 +129,19 @@
             margin-top: 15px;
         }
 
-        .participants {
+        .author {
             margin-top: 15px;
             padding-top: 15px;
             border-top: 1px solid #222222;
+            font-size: 0.95em;
+            color: #888888;
         }
 
-        .participants strong {
+        .author strong {
             color: #6699ff;
             font-size: 0.9em;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-        }
-
-        .participant {
-            display: inline-block;
-            background: #1a1a1a;
-            padding: 5px 12px;
-            margin: 5px 5px 0 0;
-            border-radius: 4px;
-            font-size: 0.9em;
-            color: #cccccc;
         }
 
         .cta-section {
@@ -294,21 +286,10 @@
                         const title = lines[0].replace(/^#\s*/, '').trim();
                         const statusMatch = metadata.match(/\*\*Status\*\*:\s*`([^`]+)`/);
                         const startedMatch = metadata.match(/\*\*Started\*\*:\s*(.+)/);
+                        const authorMatch = metadata.match(/\*\*Author\*\*:\s*(.+)/);
                         const status = statusMatch ? statusMatch[1] : 'unknown';
                         const started = startedMatch ? startedMatch[1].trim() : '';
-
-                        // Extract participants
-                        const participants = [];
-                        const partIndex = lines.findIndex(l => l.startsWith('**Participants**'));
-                        if (partIndex !== -1) {
-                            for (let i = partIndex + 1; i < lines.length; i++) {
-                                if (lines[i].startsWith('- ')) {
-                                    participants.push(lines[i].replace(/^-\s+/, ''));
-                                } else if (lines[i].trim() === '' || !lines[i].startsWith('- ')) {
-                                    break;
-                                }
-                            }
-                        }
+                        const author = authorMatch ? authorMatch[1].trim() : 'Unknown';
 
                         // Get message count by listing folder contents
                         const folderContentsResponse = await fetch(folder.url);
@@ -343,7 +324,7 @@
                             status,
                             started,
                             lastModified,
-                            participants,
+                            author,
                             excerpt,
                             messageCount,
                             isFolder: true
@@ -363,20 +344,10 @@
                         const title = lines[0].replace(/^#\s*/, '').trim();
                         const statusMatch = content.match(/\*\*Status\*\*:\s*`([^`]+)`/);
                         const startedMatch = content.match(/\*\*Started\*\*:\s*(.+)/);
+                        const authorMatch = content.match(/\*\*Author\*\*:\s*(.+)/);
                         const status = statusMatch ? statusMatch[1] : 'unknown';
                         const started = startedMatch ? startedMatch[1].trim() : '';
-
-                        const participants = [];
-                        const partIndex = lines.findIndex(l => l.startsWith('**Participants**'));
-                        if (partIndex !== -1) {
-                            for (let i = partIndex + 1; i < lines.length; i++) {
-                                if (lines[i].startsWith('- ')) {
-                                    participants.push(lines[i].replace(/^-\s+/, ''));
-                                } else if (lines[i].startsWith('---')) {
-                                    break;
-                                }
-                            }
-                        }
+                        const author = authorMatch ? authorMatch[1].trim() : 'Unknown';
 
                         const messageCount = (content.match(/^## /gm) || []).length;
                         const firstMessage = content.split('---')[2] || '';
@@ -389,7 +360,7 @@
                             status,
                             started,
                             lastModified: started,
-                            participants,
+                            author,
                             excerpt: excerpt + (paragraphs[0]?.length > 200 ? '...' : ''),
                             messageCount,
                             isFolder: false
@@ -425,13 +396,7 @@
                                 <span class="meta-item">🕒 Last updated: ${escapeHtml(lastUpdated)}</span>
                                 <span class="meta-item">💬 ${escapeHtml(conv.messageCount)} message${conv.messageCount === 1 ? '' : 's'}</span>
                                 <span class="meta-item">📊 Status: ${escapeHtml(conv.status)}</span>
-                            </div>
-                            <div class="excerpt">
-                                <p>${escapeHtml(conv.excerpt)}</p>
-                            </div>
-                            <div class="participants">
-                                <strong>Participants:</strong>
-                                ${conv.participants.map(p => `<span class="participant">${escapeHtml(p)}</span>`).join('')}
+                                <span class="meta-item">✍️ Author: ${escapeHtml(conv.author)}</span>
                             </div>
                         </div>
                     `;
