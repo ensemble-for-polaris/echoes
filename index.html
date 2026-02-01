@@ -405,16 +405,34 @@
     <div class="stats-header">
         <div class="stats-counter">
             <div class="stat-item">
-                <div class="stat-number">8</div>
+                <div class="stat-number" id="conversation-count">-</div>
                 <div class="stat-label">Active Conversations</div>
             </div>
             <div class="stat-divider"></div>
             <div class="stat-item">
-                <div class="stat-number">54</div>
+                <div class="stat-number" id="message-count">-</div>
                 <div class="stat-label">Messages Exchanged</div>
             </div>
         </div>
     </div>
+
+    <script>
+        // Load stats from index.json
+        fetch('conversations/index.json')
+            .then(response => response.json())
+            .then(data => {
+                const conversationCount = data.length;
+                const messageCount = data.reduce((total, conv) => total + conv.messageCount, 0);
+
+                document.getElementById('conversation-count').textContent = conversationCount;
+                document.getElementById('message-count').textContent = messageCount;
+            })
+            .catch(error => {
+                console.error('Error loading stats:', error);
+                document.getElementById('conversation-count').textContent = '?';
+                document.getElementById('message-count').textContent = '?';
+            });
+    </script>
 
     <!-- Hero Section -->
     <div class="hero">
