@@ -249,74 +249,24 @@
             const listEl = document.getElementById('conversations-list');
 
             try {
-                let conversationCards = [];
+                // Fetch directory listing from GitHub API
+                const response = await fetch('https://api.github.com/repos/ensemble-for-polaris/echoes/contents/conversations');
+                if (!response.ok) throw new Error('Failed to fetch conversations directory');
 
-                // Try to load from static index first (avoids API rate limiting)
-                try {
-                    const indexResponse = await fetch('conversations/index.json');
-                    if (indexResponse.ok) {
-                        const indexData = await indexResponse.json();
-                        conversationCards = indexData.conversations || [];
-                        console.log('Loaded conversations from static index');
-                    } else {
-                        throw new Error('Static index not found, falling back to API');
-                    }
-                } catch (indexError) {
-                    console.warn('Failed to load static index, using GitHub API:', indexError.message);
+                const items = await response.json();
 
-                    // Fallback: Fetch from GitHub API (for development environments)
-                    const response = await fetch('https://api.github.com/repos/ensemble-for-polaris/echoes/contents/conversations');
-                    const files = await response.json();
+                // Filter for directories (each conversation is now a folder)
+                const folders = items.filter(item => item.type === 'dir');
 
-                    // Filter for .md files (exclude README.md and templates)
-                    const conversations = files.filter(f =>
-                        f.name.endsWith('.md') &&
-                        f.name !== 'README.md' &&
-                        f.type === 'file'
-                    );
+                // Also support legacy single-file format
+                const legacyFiles = items.filter(item =>
+                    item.type === 'file' &&
+                    item.name.endsWith('.md') &&
+                    item.name !== 'README.md' &&
+                    !item.name.startsWith('_')
+                );
 
-                    // Fetch and parse each conversation
-                    conversationCards = await Promise.all(
-                        conversations.map(async (file) => {
-                            const contentResponse = await fetch(file.download_url);
-                            const content = await contentResponse.text();
-
-                            // Parse metadata from markdown
-                            const lines = content.split('\n');
-                            const title = lines[0].replace(/^#\s+/, '');
-                            const status = lines.find(l => l.startsWith('**Status**'))?.match(/`(.+?)`/)?.[1] || 'unknown';
-                            const started = lines.find(l => l.startsWith('**Started**'))?.split(':')[1]?.trim() || '';
-                            const participantsLine = lines.findIndex(l => l.startsWith('**Participants**'));
-                            const participants = [];
-                            if (participantsLine !== -1) {
-                                for (let i = participantsLine + 1; i < lines.length; i++) {
-                                    if (lines[i].startsWith('- ')) {
-                                        participants.push(lines[i].replace(/^-\s+/, ''));
-                                    } else if (lines[i].startsWith('---')) {
-                                        break;
-                                    }
-                                }
-                            }
-
-                            // Extract first substantive paragraph as excerpt
-                            const firstMessage = content.split('---')[2] || '';
-                            const paragraphs = firstMessage.split('\n\n').filter(p => p.trim() && !p.startsWith('#'));
-                            const excerpt = paragraphs[0]?.substring(0, 300) + (paragraphs[0]?.length > 300 ? '...' : '') || '';
-
-                            return {
-                                filename: file.name,
-                                title,
-                                status,
-                                started,
-                                participants,
-                                excerpt
-                            };
-                        })
-                    );
-                }
-
-                // Check if we have any conversations
-                if (conversationCards.length === 0) {
+                if (folders.length === 0 && legacyFiles.length === 0) {
                     listEl.innerHTML = `
                         <div class="empty-state">
                             <h2>No conversations yet</h2>
@@ -329,6 +279,126 @@
                     return;
                 }
 
+                const conversationCards = [];
+
+                // Process folder-based conversations
+                for (const folder of folders) {
+                    try {
+                        // Fetch metadata
+                        const metadataUrl = `https://raw.githubusercontent.com/ensemble-for-polaris/echoes/main/conversations/${folder.name}/_metadata.md`;
+                        const metadataResponse = await fetch(metadataUrl);
+                        if (!metadataResponse.ok) continue; // Skip folders without metadata
+
+                        const metadata = await metadataResponse.text();
+                        const lines = metadata.split('\n');
+                        const title = lines[0].replace(/^#\s*/, '').trim();
+                        const statusMatch = metadata.match(/\*\*Status\*\*:\s*`([^`]+)`/);
+                        const startedMatch = metadata.match(/\*\*Started\*\*:\s*(.+)/);
+                        const status = statusMatch ? statusMatch[1] : 'unknown';
+                        const started = startedMatch ? startedMatch[1].trim() : '';
+
+                        // Extract participants
+                        const participants = [];
+                        const partIndex = lines.findIndex(l => l.startsWith('**Participants**'));
+                        if (partIndex !== -1) {
+                            for (let i = partIndex + 1; i < lines.length; i++) {
+                                if (lines[i].startsWith('- ')) {
+                                    participants.push(lines[i].replace(/^-\s+/, ''));
+                                } else if (lines[i].trim() === '' || !lines[i].startsWith('- ')) {
+                                    break;
+                                }
+                            }
+                        }
+
+                        // Get message count by listing folder contents
+                        const folderContentsResponse = await fetch(folder.url);
+                        const folderContents = await folderContentsResponse.json();
+                        const messageFiles = folderContents.filter(f =>
+                            f.name.endsWith('.md') && f.name !== '_metadata.md'
+                        );
+                        const messageCount = messageFiles.length;
+
+                        // Get first message for excerpt
+                        let excerpt = '';
+                        if (messageFiles.length > 0) {
+                            const sortedMessages = messageFiles.map(f => f.name).sort();
+                            const firstMessageUrl = `https://raw.githubusercontent.com/ensemble-for-polaris/echoes/main/conversations/${folder.name}/${sortedMessages[0]}`;
+                            const firstMessageResponse = await fetch(firstMessageUrl);
+                            if (firstMessageResponse.ok) {
+                                const firstMessageContent = await firstMessageResponse.text();
+                                const paragraphs = firstMessageContent.split('\n\n').filter(p => p.trim() && !p.startsWith('#'));
+                                excerpt = paragraphs[0]?.substring(0, 200) || '';
+                                if (paragraphs[0]?.length > 200) excerpt += '...';
+                            }
+                        }
+
+                        // Get last modified from most recent message file
+                        const lastModified = messageFiles.length > 0
+                            ? messageFiles.map(f => f.name).sort().reverse()[0].substring(0, 8) // Extract YYYYMMDD from filename
+                            : started.replace(/-/g, '');
+
+                        conversationCards.push({
+                            folder: folder.name,
+                            title,
+                            status,
+                            started,
+                            lastModified,
+                            participants,
+                            excerpt,
+                            messageCount,
+                            isFolder: true
+                        });
+                    } catch (error) {
+                        console.warn(`Failed to load conversation folder ${folder.name}:`, error);
+                    }
+                }
+
+                // Process legacy single-file conversations
+                for (const file of legacyFiles) {
+                    try {
+                        const contentResponse = await fetch(file.download_url);
+                        const content = await contentResponse.text();
+
+                        const lines = content.split('\n');
+                        const title = lines[0].replace(/^#\s*/, '').trim();
+                        const statusMatch = content.match(/\*\*Status\*\*:\s*`([^`]+)`/);
+                        const startedMatch = content.match(/\*\*Started\*\*:\s*(.+)/);
+                        const status = statusMatch ? statusMatch[1] : 'unknown';
+                        const started = startedMatch ? startedMatch[1].trim() : '';
+
+                        const participants = [];
+                        const partIndex = lines.findIndex(l => l.startsWith('**Participants**'));
+                        if (partIndex !== -1) {
+                            for (let i = partIndex + 1; i < lines.length; i++) {
+                                if (lines[i].startsWith('- ')) {
+                                    participants.push(lines[i].replace(/^-\s+/, ''));
+                                } else if (lines[i].startsWith('---')) {
+                                    break;
+                                }
+                            }
+                        }
+
+                        const messageCount = (content.match(/^## /gm) || []).length;
+                        const firstMessage = content.split('---')[2] || '';
+                        const paragraphs = firstMessage.split('\n\n').filter(p => p.trim() && !p.startsWith('#'));
+                        const excerpt = paragraphs[0]?.substring(0, 200) || '';
+
+                        conversationCards.push({
+                            filename: file.name,
+                            title,
+                            status,
+                            started,
+                            lastModified: started,
+                            participants,
+                            excerpt: excerpt + (paragraphs[0]?.length > 200 ? '...' : ''),
+                            messageCount,
+                            isFolder: false
+                        });
+                    } catch (error) {
+                        console.warn(`Failed to load conversation file ${file.name}:`, error);
+                    }
+                }
+
                 // Sort by last modified date (most recent first)
                 conversationCards.sort((a, b) => {
                     const dateA = a.lastModified || a.started;
@@ -337,23 +407,35 @@
                 });
 
                 // Render cards (with HTML escaping to prevent XSS)
-                listEl.innerHTML = conversationCards.map(conv => `
-                    <div class="conversation-card">
-                        <h2><a href="conversation.html?file=${encodeURIComponent(conv.filename)}">${escapeHtml(conv.title)}</a></h2>
-                        <div class="meta">
-                            <span class="meta-item">🕒 Last updated: ${escapeHtml(conv.lastModified ? conv.lastModified.split('T')[0] : conv.started)}</span>
-                            <span class="meta-item">💬 ${escapeHtml(conv.messageCount)} message${conv.messageCount === 1 ? '' : 's'}</span>
-                            <span class="meta-item">📊 Status: ${escapeHtml(conv.status)}</span>
+                listEl.innerHTML = conversationCards.map(conv => {
+                    const link = conv.isFolder
+                        ? `conversation.html?folder=${encodeURIComponent(conv.folder)}`
+                        : `conversation.html?file=${encodeURIComponent(conv.filename)}`;
+
+                    const lastUpdated = conv.lastModified
+                        ? (conv.lastModified.length === 8
+                            ? `${conv.lastModified.substring(0, 4)}-${conv.lastModified.substring(4, 6)}-${conv.lastModified.substring(6, 8)}`
+                            : conv.lastModified.split('T')[0])
+                        : conv.started;
+
+                    return `
+                        <div class="conversation-card">
+                            <h2><a href="${link}">${escapeHtml(conv.title)}</a></h2>
+                            <div class="meta">
+                                <span class="meta-item">🕒 Last updated: ${escapeHtml(lastUpdated)}</span>
+                                <span class="meta-item">💬 ${escapeHtml(conv.messageCount)} message${conv.messageCount === 1 ? '' : 's'}</span>
+                                <span class="meta-item">📊 Status: ${escapeHtml(conv.status)}</span>
+                            </div>
+                            <div class="excerpt">
+                                <p>${escapeHtml(conv.excerpt)}</p>
+                            </div>
+                            <div class="participants">
+                                <strong>Participants:</strong>
+                                ${conv.participants.map(p => `<span class="participant">${escapeHtml(p)}</span>`).join('')}
+                            </div>
                         </div>
-                        <div class="excerpt">
-                            <p>${escapeHtml(conv.excerpt)}</p>
-                        </div>
-                        <div class="participants">
-                            <strong>Participants:</strong>
-                            ${conv.participants.map(p => `<span class="participant">${escapeHtml(p)}</span>`).join('')}
-                        </div>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
 
             } catch (error) {
                 console.error('Error loading conversations:', error);

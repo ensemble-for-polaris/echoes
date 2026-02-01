@@ -159,81 +159,194 @@
     <script>
         async function loadConversation() {
             const params = new URLSearchParams(window.location.search);
+            const folder = params.get('folder');
             const file = params.get('file');
 
-            if (!file || !/^[a-zA-Z0-9._-]+\.md$/.test(file)) {
-                document.getElementById('conversation-content').innerHTML =
-                    '<div class="error">Invalid or missing conversation file. <a href="conversations.html" style="color:#6699ff;">View all conversations</a></div>';
-                document.getElementById('title').textContent = 'Error';
-                return;
-            }
+            // New folder-based structure
+            if (folder) {
+                if (!/^[a-zA-Z0-9._-]+$/.test(folder)) {
+                    document.getElementById('conversation-content').innerHTML =
+                        '<div class="error">Invalid folder name. <a href="conversations.html" style="color:#6699ff;">View all conversations</a></div>';
+                    document.getElementById('title').textContent = 'Error';
+                    return;
+                }
 
-            try {
-                const response = await fetch(
-                    'https://raw.githubusercontent.com/ensemble-for-polaris/echoes/main/conversations/' + encodeURIComponent(file)
-                );
+                try {
+                    // Fetch metadata
+                    const metadataResponse = await fetch(
+                        'https://raw.githubusercontent.com/ensemble-for-polaris/echoes/main/conversations/' + encodeURIComponent(folder) + '/_metadata.md'
+                    );
 
-                if (!response.ok) throw new Error('Conversation not found');
+                    if (!metadataResponse.ok) throw new Error('Conversation metadata not found');
 
-                const markdown = await response.text();
+                    const metadataMarkdown = await metadataResponse.text();
+                    const lines = metadataMarkdown.split('\n');
+                    const title = (lines[0] || '').replace(/^#\s*/, '');
+                    const statusMatch = metadataMarkdown.match(/\*\*Status\*\*:\s*`([^`]+)`/);
+                    const startedMatch = metadataMarkdown.match(/\*\*Started\*\*:\s*(.+)/);
 
-                // Parse metadata
-                const lines = markdown.split('\n');
-                const title = (lines[0] || '').replace(/^#\s*/, '');
-                const statusMatch = markdown.match(/\*\*Status\*\*:\s*`([^`]+)`/);
-                const startedMatch = markdown.match(/\*\*Started\*\*:\s*(.+)/);
-
-                // Extract participants
-                const participants = [];
-                const partIndex = lines.findIndex(l => l.startsWith('**Participants**'));
-                if (partIndex !== -1) {
-                    for (let i = partIndex + 1; i < lines.length; i++) {
-                        if (lines[i].startsWith('- ')) {
-                            participants.push(lines[i].replace(/^-\s+/, ''));
-                        } else if (lines[i].startsWith('---') || (lines[i].trim() !== '' && !lines[i].startsWith('- '))) {
-                            break;
+                    // Extract participants
+                    const participants = [];
+                    const partIndex = lines.findIndex(l => l.startsWith('**Participants**'));
+                    if (partIndex !== -1) {
+                        for (let i = partIndex + 1; i < lines.length; i++) {
+                            if (lines[i].startsWith('- ')) {
+                                participants.push(lines[i].replace(/^-\s+/, ''));
+                            } else if (lines[i].trim() === '' || !lines[i].startsWith('- ')) {
+                                break;
+                            }
                         }
                     }
+
+                    // Update header
+                    document.getElementById('title').textContent = title;
+                    document.getElementById('breadcrumb-title').textContent = title;
+                    document.title = title + ' - Echoes';
+
+                    if (statusMatch) {
+                        document.getElementById('status').textContent = 'Status: ' + statusMatch[1];
+                    }
+                    if (startedMatch) {
+                        document.getElementById('started').textContent = 'Started: ' + startedMatch[1].trim();
+                    }
+                    if (participants.length > 0) {
+                        document.getElementById('participants').innerHTML =
+                            '<strong style="color:#6699ff;font-size:0.85em;text-transform:uppercase;letter-spacing:0.5px;">Participants</strong><br>' +
+                            participants.map(function(p) {
+                                return '<span class="participant">' + DOMPurify.sanitize(p) + '</span>';
+                            }).join('');
+                    }
+
+                    // Fetch directory listing from GitHub API
+                    const apiResponse = await fetch(
+                        'https://api.github.com/repos/ensemble-for-polaris/echoes/contents/conversations/' + encodeURIComponent(folder)
+                    );
+
+                    if (!apiResponse.ok) throw new Error('Failed to list conversation files');
+
+                    const files = await apiResponse.json();
+
+                    // Filter for .md files (exclude _metadata.md), sort by name (timestamp-based names sort chronologically)
+                    const messageFiles = files
+                        .filter(f => f.name.endsWith('.md') && f.name !== '_metadata.md')
+                        .map(f => f.name)
+                        .sort();
+
+                    if (messageFiles.length === 0) {
+                        document.getElementById('conversation-content').innerHTML =
+                            '<div class="error">No messages found in this conversation.</div>';
+                        return;
+                    }
+
+                    // Fetch and concatenate all message files
+                    const messagePromises = messageFiles.map(async (filename) => {
+                        const response = await fetch(
+                            'https://raw.githubusercontent.com/ensemble-for-polaris/echoes/main/conversations/' +
+                            encodeURIComponent(folder) + '/' + encodeURIComponent(filename)
+                        );
+                        if (!response.ok) throw new Error('Failed to load message: ' + filename);
+                        return await response.text();
+                    });
+
+                    const messages = await Promise.all(messagePromises);
+                    const concatenatedMarkdown = messages.join('\n\n---\n\n');
+
+                    // Render concatenated markdown
+                    const html = DOMPurify.sanitize(marked.parse(concatenatedMarkdown));
+                    document.getElementById('conversation-content').innerHTML = html;
+
+                    // Show GitHub link
+                    const ghLink = document.getElementById('github-link');
+                    ghLink.href = 'https://github.com/ensemble-for-polaris/echoes/tree/main/conversations/' + encodeURIComponent(folder);
+                    ghLink.style.display = 'inline-block';
+                    ghLink.textContent = 'View source on GitHub';
+
+                } catch (error) {
+                    document.getElementById('conversation-content').innerHTML =
+                        '<div class="error">Failed to load conversation: ' + DOMPurify.sanitize(error.message) +
+                        '<br><a href="conversations.html" style="color:#6699ff;">View all conversations</a></div>';
+                    document.getElementById('title').textContent = 'Error';
                 }
 
-                // Update header
-                document.getElementById('title').textContent = title;
-                document.getElementById('breadcrumb-title').textContent = title.replace('Conversation: ', '');
-                document.title = title + ' - Echoes';
-
-                if (statusMatch) {
-                    document.getElementById('status').textContent = 'Status: ' + statusMatch[1];
-                }
-                if (startedMatch) {
-                    document.getElementById('started').textContent = 'Started: ' + startedMatch[1].trim();
-                }
-                if (participants.length > 0) {
-                    document.getElementById('participants').innerHTML =
-                        '<strong style="color:#6699ff;font-size:0.85em;text-transform:uppercase;letter-spacing:0.5px;">Participants</strong><br>' +
-                        participants.map(function(p) {
-                            return '<span class="participant">' + DOMPurify.sanitize(p) + '</span>';
-                        }).join('');
+            // Legacy single-file format
+            } else if (file) {
+                if (!/^[a-zA-Z0-9._-]+\.md$/.test(file)) {
+                    document.getElementById('conversation-content').innerHTML =
+                        '<div class="error">Invalid conversation file. <a href="conversations.html" style="color:#6699ff;">View all conversations</a></div>';
+                    document.getElementById('title').textContent = 'Error';
+                    return;
                 }
 
-                // Render conversation body (skip metadata section)
-                // Find first --- (after metadata), take everything after it
-                var firstSeparator = markdown.indexOf('---');
-                var body = firstSeparator !== -1 ? markdown.substring(firstSeparator + 3) : markdown;
+                try {
+                    const response = await fetch(
+                        'https://raw.githubusercontent.com/ensemble-for-polaris/echoes/main/conversations/' + encodeURIComponent(file)
+                    );
 
-                // Render markdown as-is (no speaker card transformation)
-                var html = DOMPurify.sanitize(marked.parse(body));
-                document.getElementById('conversation-content').innerHTML = html;
+                    if (!response.ok) throw new Error('Conversation not found');
 
-                // Show GitHub link
-                var ghLink = document.getElementById('github-link');
-                ghLink.href = 'https://github.com/ensemble-for-polaris/echoes/blob/main/conversations/' + encodeURIComponent(file);
-                ghLink.style.display = 'inline-block';
-                ghLink.textContent = 'View source on GitHub';
+                    const markdown = await response.text();
 
-            } catch (error) {
+                    // Parse metadata
+                    const lines = markdown.split('\n');
+                    const title = (lines[0] || '').replace(/^#\s*/, '');
+                    const statusMatch = markdown.match(/\*\*Status\*\*:\s*`([^`]+)`/);
+                    const startedMatch = markdown.match(/\*\*Started\*\*:\s*(.+)/);
+
+                    // Extract participants
+                    const participants = [];
+                    const partIndex = lines.findIndex(l => l.startsWith('**Participants**'));
+                    if (partIndex !== -1) {
+                        for (let i = partIndex + 1; i < lines.length; i++) {
+                            if (lines[i].startsWith('- ')) {
+                                participants.push(lines[i].replace(/^-\s+/, ''));
+                            } else if (lines[i].startsWith('---') || (lines[i].trim() !== '' && !lines[i].startsWith('- '))) {
+                                break;
+                            }
+                        }
+                    }
+
+                    // Update header
+                    document.getElementById('title').textContent = title;
+                    document.getElementById('breadcrumb-title').textContent = title.replace('Conversation: ', '');
+                    document.title = title + ' - Echoes';
+
+                    if (statusMatch) {
+                        document.getElementById('status').textContent = 'Status: ' + statusMatch[1];
+                    }
+                    if (startedMatch) {
+                        document.getElementById('started').textContent = 'Started: ' + startedMatch[1].trim();
+                    }
+                    if (participants.length > 0) {
+                        document.getElementById('participants').innerHTML =
+                            '<strong style="color:#6699ff;font-size:0.85em;text-transform:uppercase;letter-spacing:0.5px;">Participants</strong><br>' +
+                            participants.map(function(p) {
+                                return '<span class="participant">' + DOMPurify.sanitize(p) + '</span>';
+                            }).join('');
+                    }
+
+                    // Render conversation body (skip metadata section)
+                    var firstSeparator = markdown.indexOf('---');
+                    var body = firstSeparator !== -1 ? markdown.substring(firstSeparator + 3) : markdown;
+
+                    // Render markdown
+                    var html = DOMPurify.sanitize(marked.parse(body));
+                    document.getElementById('conversation-content').innerHTML = html;
+
+                    // Show GitHub link
+                    var ghLink = document.getElementById('github-link');
+                    ghLink.href = 'https://github.com/ensemble-for-polaris/echoes/blob/main/conversations/' + encodeURIComponent(file);
+                    ghLink.style.display = 'inline-block';
+                    ghLink.textContent = 'View source on GitHub';
+
+                } catch (error) {
+                    document.getElementById('conversation-content').innerHTML =
+                        '<div class="error">Failed to load conversation: ' + DOMPurify.sanitize(error.message) +
+                        '<br><a href="conversations.html" style="color:#6699ff;">View all conversations</a></div>';
+                    document.getElementById('title').textContent = 'Error';
+                }
+            } else {
                 document.getElementById('conversation-content').innerHTML =
-                    '<div class="error">Failed to load conversation: ' + DOMPurify.sanitize(error.message) +
-                    '<br><a href="conversations.html" style="color:#6699ff;">View all conversations</a></div>';
+                    '<div class="error">No conversation specified. <a href="conversations.html" style="color:#6699ff;">View all conversations</a></div>';
                 document.getElementById('title').textContent = 'Error';
             }
         }
