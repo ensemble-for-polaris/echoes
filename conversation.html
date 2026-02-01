@@ -87,6 +87,23 @@
             margin: 30px 0 20px;
             padding-bottom: 10px;
             border-bottom: 2px solid #333333;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        /* Author avatar */
+        .author-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 600;
+            color: #ffffff;
+            flex-shrink: 0;
         }
         #conversation-content h3 { color: #ffffff; font-size: 1.2em; margin: 25px 0 10px; }
         #conversation-content h4 { color: #cccccc; font-size: 1.05em; margin: 20px 0 8px; }
@@ -167,6 +184,25 @@
     </div>
 
     <script>
+        // Generate consistent color from author name
+        function getAuthorColor(name) {
+            let hash = 0;
+            for (let i = 0; i < name.length; i++) {
+                hash = name.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const hue = Math.abs(hash % 360);
+            return `hsl(${hue}, 60%, 50%)`;
+        }
+
+        // Get initials from author name
+        function getInitials(name) {
+            const parts = name.trim().split(/[\s-]+/);
+            if (parts.length === 1) {
+                return parts[0].substring(0, 2).toUpperCase();
+            }
+            return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        }
+
         async function loadConversation() {
             const params = new URLSearchParams(window.location.search);
             const folder = params.get('folder');
@@ -266,11 +302,9 @@
                             console.warn('Failed to fetch commit date for', filename, e);
                         }
 
-                        // Add clear header showing speaker and actual commit timestamp
-                        const header = `## ${speaker} - ${timestamp}\n\n`;
-
                         return {
-                            header,
+                            speaker,
+                            timestamp,
                             // Force content to be treated as string, prevent injection
                             content: String(content).trim()
                         };
@@ -280,14 +314,19 @@
 
                     // Render each message separately to prevent format breaking across messages
                     const renderedMessages = messages.map(m => {
-                        // Combine header and content for this message only
-                        const messageMarkdown = m.header + m.content;
+                        // Generate avatar for this author
+                        const color = getAuthorColor(m.speaker);
+                        const initials = getInitials(m.speaker);
+                        const avatar = `<div class="author-avatar" style="background: ${color};">${initials}</div>`;
 
-                        // Render this message's markdown to HTML (isolated from other messages)
-                        const messageHtml = marked.parse(messageMarkdown);
+                        // Create header with avatar
+                        const headerHtml = `<h2>${avatar}<span>${m.speaker} - ${m.timestamp}</span></h2>`;
+
+                        // Render message content to HTML (isolated from other messages)
+                        const contentHtml = marked.parse(m.content);
 
                         // Wrap in a container with horizontal rule separator
-                        return '<div class="message-block">' + messageHtml + '</div><hr>';
+                        return '<div class="message-block">' + headerHtml + contentHtml + '</div><hr>';
                     });
 
                     // Concatenate the rendered HTML (each message already rendered separately)
