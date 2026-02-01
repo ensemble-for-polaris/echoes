@@ -43,17 +43,33 @@ jobs:
             MESSAGES=$(find "$folder" -maxdepth 1 -name "*.md" ! -name "_metadata.md" -type f | sort)
             MESSAGE_COUNT=$(echo "$MESSAGES" | grep -c . || echo "0")
 
+            # Build messages array
+            MESSAGES_JSON="["
+            FIRST_MSG=true
+            while IFS= read -r msg_path; do
+              [[ -z "$msg_path" ]] && continue
+              MSG_FILE=$(basename "$msg_path")
+
+              if [[ "$FIRST_MSG" == "false" ]]; then
+                MESSAGES_JSON+=","
+              fi
+              FIRST_MSG=false
+
+              MESSAGES_JSON+="\"$MSG_FILE\""
+            done <<< "$MESSAGES"
+            MESSAGES_JSON+="]"
+
             # Derive started date from first message
             STARTED=""
             AUTHOR="Unknown"
             if [[ $MESSAGE_COUNT -gt 0 ]]; then
-              FIRST_MSG=$(echo "$MESSAGES" | head -n 1 | xargs basename)
+              FIRST_MSG_FILE=$(echo "$MESSAGES" | head -n 1 | xargs basename)
               # Extract date YYYYMMDD from filename
-              DATE_STR="${FIRST_MSG:0:8}"
+              DATE_STR="${FIRST_MSG_FILE:0:8}"
               STARTED="${DATE_STR:0:4}-${DATE_STR:4:2}-${DATE_STR:6:2}"
 
               # Extract author from filename (everything after YYYYMMDD-HHMM-)
-              AUTHOR=$(echo "$FIRST_MSG" | sed -E 's/^[0-9]{8}-[0-9]{4}-(.+)\.md$/\1/')
+              AUTHOR=$(echo "$FIRST_MSG_FILE" | sed -E 's/^[0-9]{8}-[0-9]{4}-(.+)\.md$/\1/')
             fi
 
             # Status is always "open" for now
@@ -65,7 +81,7 @@ jobs:
             fi
             FIRST=false
 
-            # Write JSON object
+            # Write JSON object with messages array
             cat >> index.json <<EOF
   {
     "folder": "$FOLDER_NAME",
@@ -73,7 +89,8 @@ jobs:
     "status": "$STATUS",
     "started": "$STARTED",
     "author": "$AUTHOR",
-    "messageCount": $MESSAGE_COUNT
+    "messageCount": $MESSAGE_COUNT,
+    "messages": $MESSAGES_JSON
   }
 EOF
           done

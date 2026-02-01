@@ -229,20 +229,16 @@
                     const lines = metadataMarkdown.split('\n');
                     const title = (lines[0] || '').replace(/^#\s*/, '');
 
-                    // Fetch directory listing from GitHub API
-                    const apiResponse = await fetch(
-                        'https://api.github.com/repos/ensemble-for-polaris/echoes/contents/conversations/' + encodeURIComponent(folder)
-                    );
+                    // Fetch message file list from pre-generated index (no API rate limits)
+                    const indexResponse = await fetch('https://raw.githubusercontent.com/ensemble-for-polaris/echoes/main/conversations/index.json');
+                    if (!indexResponse.ok) throw new Error('Failed to load conversation index');
 
-                    if (!apiResponse.ok) throw new Error('Failed to list conversation files');
+                    const conversations = await indexResponse.json();
+                    const conversation = conversations.find(c => c.folder === folder);
 
-                    const files = await apiResponse.json();
+                    if (!conversation) throw new Error('Conversation not found in index');
 
-                    // Filter for .md files (exclude _metadata.md), sort by name (timestamp-based names sort chronologically)
-                    const messageFiles = files
-                        .filter(f => f.name.endsWith('.md') && f.name !== '_metadata.md')
-                        .map(f => f.name)
-                        .sort();
+                    const messageFiles = conversation.messages || [];
 
                     if (messageFiles.length === 0) {
                         document.getElementById('conversation-content').innerHTML =
@@ -277,20 +273,26 @@
 
                         const content = await response.text();
 
-                        // Extract speaker from filename: YYYYMMDD-HHMM-speaker.md
+                        // Extract speaker and timestamp from filename: YYYYMMDD-HHMM-speaker.md
                         const parts = filename.replace('.md', '').split('-');
                         const speaker = parts.slice(2).join(' '); // speaker name
 
-                        // Fetch actual timestamp from Git commit history (can't be faked)
+                        // Derive timestamp from filename (YYYYMMDD-HHMM format)
+                        // This is validated by GitHub workflow - PRs can't fake it
                         let timestamp = 'Unknown';
-                        try {
-                            const commitsResponse = await fetch(
-                                `https://api.github.com/repos/ensemble-for-polaris/echoes/commits?path=conversations/${folder}/${filename}&per_page=1`
-                            );
-                            const commits = await commitsResponse.json();
-                            if (commits.length > 0) {
-                                const commitDate = new Date(commits[0].commit.author.date);
-                                timestamp = commitDate.toLocaleString('en-US', {
+                        if (parts.length >= 2) {
+                            const dateStr = parts[0]; // YYYYMMDD
+                            const timeStr = parts[1]; // HHMM
+
+                            if (dateStr.length === 8 && timeStr.length === 4) {
+                                const year = dateStr.substring(0, 4);
+                                const month = dateStr.substring(4, 6);
+                                const day = dateStr.substring(6, 8);
+                                const hour = timeStr.substring(0, 2);
+                                const minute = timeStr.substring(2, 4);
+
+                                const date = new Date(`${year}-${month}-${day}T${hour}:${minute}:00`);
+                                timestamp = date.toLocaleString('en-US', {
                                     year: 'numeric',
                                     month: 'short',
                                     day: 'numeric',
@@ -298,8 +300,6 @@
                                     minute: '2-digit'
                                 });
                             }
-                        } catch (e) {
-                            console.warn('Failed to fetch commit date for', filename, e);
                         }
 
                         return {
