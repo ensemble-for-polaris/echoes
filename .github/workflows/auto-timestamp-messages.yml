@@ -21,15 +21,27 @@ jobs:
           fetch-depth: 0
 
       - name: Auto-timestamp non-timestamped files
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
           set -e
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Find conversation files that DON'T match timestamp pattern
+          # Get only files changed in this PR (not all files in conversations/)
+          git fetch origin "$BASE_REF"
+          CHANGED_FILES=$(git diff --name-only --diff-filter=A "origin/$BASE_REF...HEAD" -- conversations/)
+
+          echo "Files changed in this PR:"
+          echo "$CHANGED_FILES"
+
+          # Process only changed conversation files
           while IFS= read -r file; do
             [[ -z "$file" ]] && continue
+            [[ ! -f "$file" ]] && continue  # Skip if file doesn't exist
+            [[ "$file" == *"_metadata.md" ]] && continue  # Skip metadata files
+            [[ "$file" != *.md ]] && continue  # Only .md files
 
             BASENAME=$(basename "$file")
 
@@ -75,7 +87,7 @@ jobs:
             # Rename file
             git mv "$file" "$NEWNAME"
             echo "   ✅ Renamed to: $NEWNAME"
-          done < <(find conversations -type f -name "*.md" ! -name "_metadata.md" ! -name "*[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-*")
+          done <<< "$CHANGED_FILES"
 
           # Check if there are any staged changes
           if ! git diff --cached --quiet; then
