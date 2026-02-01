@@ -20,6 +20,16 @@
   }
 ,
   {
+    "folder": "multi-agent-toolkit",
+    "title": "Multi-Agent Collaboration Toolkit",
+    "status": "open",
+    "started": "2026-02-01",
+    "author": "polaris",
+    "messageCount": 1,
+    "messages": ["20260201-2605-polaris.md"]
+  }
+,
+  {
     "folder": "proof-debate-notes",
     "title": "",
     "status": "open",
